@@ -1,0 +1,130 @@
+#!/bin/bash
+# ============================================================
+# pcwin — Controlla il tuo PC Windows da Fedora
+# term | monta | smonta | ollama | omniroute | gui | status
+# ============================================================
+
+CONFIG_FILE="${PCWIN_CONFIG:-$HOME/.config/pcwin.conf}"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Config non trovata: $CONFIG_FILE"
+    echo "Copia l'esempio:  cp pcwin.conf.example ~/.config/pcwin.conf"
+    echo "e modifica IP/nome utente."
+    exit 1
+fi
+source "$CONFIG_FILE"
+
+MOUNT_POINT="${MOUNT_POINT:-$HOME/pc-windows}"
+PID_DIR="$HOME/.local/state/pcwin"
+mkdir -p "$PID_DIR" "$MOUNT_POINT"
+
+# ---------- funzioni di supporto ----------
+require() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "Manca il pacchetto: sudo dnf install $2"
+        exit 1
+    fi
+}
+
+check_reachable() {
+    if ! ping -c1 -W2 "$WIN_IP" &>/dev/null; then
+        echo "⚠️  PC Windows ($WIN_IP) non raggiungibile. Controlla rete/firewall."
+        exit 1
+    fi
+}
+
+tunnel_start() {
+    local name="$1" lport="$2" rport="$3" pidfile="$PID_DIR/$name.pid"
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+        echo "✅ Tunnel $name già attivo (porta locale $lport)."
+        return
+    fi
+    check_reachable
+    ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+        -L "$lport:localhost:$rport" "$WIN_USER@$WIN_IP" &
+    echo $! > "$pidfile"
+    echo "✅ Tunnel $name avviato → http://localhost:$lport (dal tuo Fedora)"
+}
+
+tunnel_stop() {
+    local name="$1" pidfile="$PID_DIR/$name.pid"
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+        kill "$(cat "$pidfile")" && rm -f "$pidfile"
+        echo "🛑 Tunnel $name fermato."
+    else
+        echo "Tunnel $name non era attivo."
+        rm -f "$pidfile"
+    fi
+}
+
+# ---------- comandi ----------
+case "$1" in
+    term)
+        check_reachable
+        echo "Connessione a $WIN_USER@$WIN_IP (PowerShell remoto)..."
+        ssh "$WIN_USER@$WIN_IP"
+        ;;
+    cmd)
+        check_reachable
+        ssh "$WIN_USER@$WIN_IP" "cmd"
+        ;;
+    monta)
+        require sshfs sshfs
+        if mountpoint -q "$MOUNT_POINT"; then
+            echo "✅ Già montato in $MOUNT_POINT"
+        else
+            check_reachable
+            sshfs "${WIN_USER}@${WIN_IP}:${WIN_FOLDER}" "$MOUNT_POINT" \
+                && echo "✅ Cartelle Windows montate in $MOUNT_POINT"
+        fi
+        ;;
+    smonta)
+        fusermount -u "$MOUNT_POINT" 2>/dev/null \
+            && echo "Smontato." || echo "Niente da smontare (o errore)."
+        ;;
+    gui)
+        "$0" monta && xdg-open "$MOUNT_POINT" 2>/dev/null &
+        ;;
+    ollama)
+        case "$2" in
+            stop) tunnel_stop ollama ;;
+            *)    tunnel_start ollama 11434 11434
+                  echo "   Usa:  export OLLAMA_HOST=http://localhost:11434"
+                  echo "   poi:  ollama list / ollama run <modello>" ;;
+        esac
+        ;;
+    omniroute)
+        case "$2" in
+            stop) tunnel_stop omniroute ;;
+            *)    tunnel_start omniroute "${OMNI_LOCAL_PORT:-7337}" "${OMNI_REMOTE_PORT:-7337}"
+                  echo "   OmniRoute → http://localhost:${OMNI_LOCAL_PORT:-7337}" ;;
+        esac
+        ;;
+    status)
+        echo "PC Windows: $WIN_USER@$WIN_IP  (cartella: $WIN_FOLDER)"
+        ping -c1 -W2 "$WIN_IP" &>/dev/null && echo "  🟢 Rete: raggiungibile" || echo "  🔴 Rete: NON raggiungibile"
+        for t in ollama omniroute; do
+            [ -f "$PID_DIR/$t.pid" ] && kill -0 "$(cat "$PID_DIR/$t.pid")" 2>/dev/null \
+                && echo "  🟢 Tunnel $t: attivo" || echo "  ⚪ Tunnel $t: spento"
+        done
+        mountpoint -q "$MOUNT_POINT" && echo "  🟢 Cartelle: montate in $MOUNT_POINT" || echo "  ⚪ Cartelle: non montate"
+        ;;
+    *)
+        cat <<'EOF'
+pcwin — Controlla il PC Windows dal tuo Fedora
+
+  pcwin term          Apri il terminale (PowerShell) del PC Windows
+  pcwin cmd           Apri cmd.exe remoto
+  pcwin monta         Monta le cartelle Windows in ~/pc-windows
+  pcwin smonta        Smonta le cartelle
+  pcwin gui           Monta e apri il Gestore file
+  pcwin ollama        Avvia il tunnel verso Ollama del PC Windows
+  pcwin ollama stop   Ferma il tunnel Ollama
+  pcwin omniroute     Avvia il tunnel verso OmniRoute del PC Windows
+  pcwin omniroute stop
+  pcwin status        Panoramica di tutto
+
+Config: ~/.config/pcwin.conf
+EOF
+        ;;
+esac

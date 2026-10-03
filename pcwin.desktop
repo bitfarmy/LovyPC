@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=PC Windows
+Comment=Terminale e cartelle del PC Windows
+Exec=gnome-terminal -- bash -c "pcwin term; exec bash"
+Icon=preferences-system-network
+Terminal=false
+Type=Application
+Categories=Utility;
