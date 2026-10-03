@@ -1,0 +1,5 @@
+# Config locale (contiene IP/utente)
+pcwin.conf
+
+# File di stato dei tunnel
+*.pid

@@ -12,8 +12,11 @@ Controlla il tuo PC Windows dal tuo Fedora con un solo comando: terminale remoto
 
 ## Requisiti
 
-- Sul PC Windows: OpenSSH Server attivo ([guida Microsoft](https://learn.microsoft.com/windows-server/administration/openssh/openssh_install_firstuse))
-- Sul Fedora: `sudo dnf install sshfs openssh-clients`
+- Sul PC Windows: OpenSSH Server attivo ([guida Microsoft](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse))
+- Sul Fedora:
+  ```bash
+  sudo dnf install sshfs openssh-clients fuse3 iputils
+  ```
 - Ollama / OmniRoute in esecuzione sul PC Windows (per i rispettivi comandi)
 
 ## Installazione
@@ -35,6 +38,7 @@ ssh-copy-id UtenteWindows@192.168.1.x
 ```bash
 pcwin status        # panoramica: rete, tunnel, montaggi
 pcwin term          # terminale PowerShell sul PC Windows
+pcwin cmd           # prompt cmd.exe sul PC Windows
 pcwin monta         # monta le cartelle in ~/pc-windows
 pcwin gui           # monta e apri il Gestore file
 pcwin ollama        # tunnel → Ollama su localhost:11434
