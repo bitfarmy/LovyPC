@@ -184,9 +184,11 @@ case "$1" in
             auto)   tunnel_auto tramamind enable ;;
             noauto) tunnel_auto tramamind disable ;;
             ui)     case "$3" in
-                        stop) tunnel_stop tramamind-ui ;;
-                        *)    tunnel_start tramamind-ui 3000 3000
-                              echo "   OpenHands → http://localhost:3000" ;;
+                        stop)   tunnel_stop tramamind-ui ;;
+                        auto)   tunnel_auto tramamind-ui enable ;;
+                        noauto) tunnel_auto tramamind-ui disable ;;
+                        *)      tunnel_start tramamind-ui 3000 3000
+                                echo "   OpenHands → http://localhost:3000" ;;
                     esac ;;
             *)      tunnel_start tramamind 20128 20128
                     echo "   OmniRoute → http://localhost:20128"

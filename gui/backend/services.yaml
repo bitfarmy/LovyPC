@@ -21,6 +21,17 @@ services:
         pcwin_cmd: "tramamind ui"
         url: http://localhost:3000
 
+  ollama:
+    name: Ollama
+    description: Modelli locali (debug — usa solo se OmniRoute non risponde)
+    icon: "🦙"
+    tunnels:
+      - name: main
+        display: Ollama API
+        port: 11434
+        pcwin_cmd: ollama
+        url: http://localhost:11434
+
   # Esempio per futuri servizi:
   # mioservizio:
   #   name: Mio Servizio

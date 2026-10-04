@@ -1,68 +1,76 @@
-# LovyPC GUI v7 — Win95 Edition
+# LovyPC — Connettore universale PC Windows ↔ Fedora
 
-Interfaccia grafica stile Windows 95 per [LovyPC](https://github.com/bitfarmy/LovyPC) — **connettore universale tra PC Windows e Fedora**.
+LovyPC collega il tuo PC Windows alla tua Fedora: terminale remoto, cartelle
+montate via SSHFS e tunnel SSH per i tuoi servizi (TramaMind/OmniRoute,
+OpenHands, Ollama e qualunque altro servizio futuro).
 
-## ⚠️ Sicurezza
+Composto da due componenti:
 
-**Tool locale senza autenticazione.** Il server gira su `127.0.0.1:8080` e non deve essere esposto su rete esterna.
+| Componente | Descrizione |
+|---|---|
+| **`pcwin`** | CLI bash — terminale, mount, tunnel, service systemd |
+| **`gui/`** | GUI web stile Win95 (Flask) — tab SYSTEM / SERVICES / CONFIG / LOGS |
 
-## Installazione
+## Installazione CLI
 
 ```bash
-cd lovypc-gui
+sudo cp pcwin /usr/local/bin/ && sudo chmod +x /usr/local/bin/pcwin
+mkdir -p ~/.config && cp pcwin.conf.example ~/.config/pcwin.conf
+# Modifica WIN_USER, WIN_IP, WIN_FOLDER in ~/.config/pcwin.conf
+```
+
+## Comandi pcwin
+
+```bash
+pcwin term              # SSH PowerShell remoto
+pcwin cmd               # SSH cmd.exe
+pcwin monta             # Mount SSHFS in ~/pc-windows
+pcwin smonta            # Unmount
+pcwin tramamind         # Tunnel → OmniRoute :20128
+pcwin tramamind ui      # Tunnel → OpenHands :3000
+pcwin ollama            # Tunnel → Ollama :11434 (debug)
+pcwin tramamind stop    # Ferma tunnel
+pcwin tramamind auto    # Avvio automatico (systemd user)
+pcwin status            # Panoramica
+pcwin installa-service  # Crea i service systemd user
+```
+
+## GUI (gui/)
+
+```bash
+cd gui
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cd backend
-python server.py
+cd backend && python server.py
 ```
 
-Poi apri il browser su **http://localhost:8080**
+Poi apri **http://localhost:8080**
 
-## Per fermare
+> ⚠️ **Sicurezza**: la GUI è un tool locale senza autenticazione.
+> Gira solo su `127.0.0.1:8080` — non esporla su rete esterna.
 
-`Ctrl+C` nel terminale dove gira `server.py`
+## Aggiungere un servizio
 
-## Fix dalla review v6
+Modifica `gui/backend/services.yaml` aggiungendo un blocco — la GUI lo
+rileva automaticamente al prossimo refresh, senza toccare codice. Vedi i
+commenti nel file per la sintassi e il naming dei service systemd.
 
-| # | Problema | Soluzione |
-|---|---|---|
-| 🔴 | LED non aggiornati al primo giro | `await loadServices()` prima di `refreshStatus()` |
-| 🟡 | `$HOME` non espanso in MOUNT_POINT | Campo readonly, escluso da save |
-| 🟡 | Versioni disallineate (v3/v4/v6) | Allineate a v7 |
-
-## API Backend
-
-| Route | Metodo | Descrizione |
-|---|---|---|
-| `/api/health` | GET | Health check (versione, pcwin_found) |
-| `/api/status` | GET | Stato completo (network, tunnels, mount) |
-| `/api/services` | GET | Lista servizi da services.yaml |
-| `/api/config` | GET/POST | Leggi/Scrivi config (MOUNT_POINT readonly) |
-| `/api/connect/<svc>/<tunnel>` | POST | Connetti tunnel specifico |
-| `/api/disconnect/<svc>/<tunnel>` | POST | Disconnetti tunnel specifico |
-| `/api/connect/service/<svc>` | POST | Connetti tutti i tunnel di un servizio |
-| `/api/disconnect/service/<svc>` | POST | Disconnetti tutti i tunnel |
-| `/api/mount` | POST | Monta cartelle via SSHFS |
-| `/api/unmount` | POST | Smonta cartelle |
-| `/api/open-terminal` | POST | Apre gnome-terminal con pcwin term |
-| `/api/open-folder` | POST | Apre xdg-open sul mount point |
-| `/api/auto/<svc>/<tunnel>/<action>` | POST | Abilita/disabilita avvio automatico |
-
-## Struttura
+## Struttura del repo
 
 ```
-lovypc-gui/
-├── backend/
-│   ├── server.py          # Flask API
-│   └── services.yaml      # Definizione servizi
-├── frontend/
-│   ├── index.html         # Shell Win95 con tab
-│   ├── css/win95.css      # Tema
-│   └── js/app.js          # Logica dinamica
-├── requirements.txt
-└── README.md
+LovyPC/
+├── pcwin                  # CLI bash
+├── pcwin.conf.example     # Config di esempio
+├── pcwin.desktop          # Launcher desktop
+├── gui/                   # GUI web (Flask + Win95)
+│   ├── backend/           # server.py + services.yaml
+│   ├── frontend/          # index.html, css/, js/
+│   └── requirements.txt
+├── ARCHITECTURE.md        # Architettura e API backend
+├── CHANGELOG.md
+└── LICENSE                # MIT
 ```
 
 ## Licenza
 
-MIT
+MIT — vedi [LICENSE](LICENSE)

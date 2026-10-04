@@ -1,5 +1,19 @@
 # Changelog
 
+## v7.1 (2026-10-04) — Fix end-to-end + servizio Ollama
+
+### GUI v7
+- LED tunnel rilevati anche in modalità PID file (senza systemd)
+- Terminale: preferenza ptyxis, fallback gnome-terminal
+- Servizio Ollama aggiunto a services.yaml (debug)
+- `pcwin tramamind ui auto/noauto` gestito correttamente
+- Header app.js allineato a v7; dettaglio errori in CONNECT ALL
+
+### Repo
+- GUI integrata come sottocartella `gui/`
+- README radice (CLI + GUI), gui/README.md dedicato
+- Test end-to-end API: 15/15 pass
+
 ## GUI v7 (2026-10-04)
 
 - Allineamento frontend/backend (route dinamiche)

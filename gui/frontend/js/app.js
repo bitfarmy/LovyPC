@@ -1,5 +1,5 @@
 // ============================================
-// LovyPC GUI v6 — Frontend
+// LovyPC GUI v7.1 — Frontend
 // Allineato a server.py generico (route dinamiche)
 // ============================================
 
@@ -292,7 +292,10 @@ async function connectService(svcKey) {
                 showSuccess('SERVICE CONNECTED ✓');
                 addLog(`Service ${svcKey} connected`, 'info');
             } else {
-                showError('Some tunnels failed to connect');
+                const failed = Object.entries(data.results || {})
+                    .filter(([, ok]) => !ok).map(([t]) => t).join(', ');
+                showError('Tunnels falliti: ' + (failed || 'unknown'));
+                addLog(`Service ${svcKey}: falliti → ${failed}`, 'error');
             }
             refreshStatus();
         }, 1500);
