@@ -6,6 +6,25 @@ set -e
 GUI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$GUI_DIR")"
 
+# --install-icon: installa il launcher nel menu Applicazioni di Fedora
+if [ "$1" = "--install-icon" ]; then
+    mkdir -p "$HOME/.local/share/applications"
+    cat > "$HOME/.local/share/applications/lovypc-gui.desktop" <<EOF
+[Desktop Entry]
+Name=LovyPC GUI
+Comment=Connettore universale PC Windows ↔ Fedora — GUI Win95
+Exec=bash -c "nohup $GUI_DIR/start.sh >/dev/null 2>&1 &"
+Icon=computer
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+Keywords=windows;ssh;tunnel;lovypc;pcwin;
+EOF
+    echo "[OK] Icona installata: la trovi nel menu Applicazioni come 'LovyPC GUI'"
+    echo "     (se sposti la cartella del repo, rilancia: bash gui/start.sh --install-icon)"
+    exit 0
+fi
+
 echo "╔══════════════════════════════════════════╗"
 echo "║     LovyPC GUI — Avvio                   ║"
 echo "╚══════════════════════════════════════════╝"
@@ -38,7 +57,8 @@ if ! "$GUI_DIR/venv/bin/python" -c "import flask, flask_cors, yaml" &>/dev/null;
     "$GUI_DIR/venv/bin/pip" install -q -r "$GUI_DIR/requirements.txt"
 fi
 
-# 4. avvia il server
+# 4. avvia il server (e apri il browser dopo 2s)
 echo "[OK] Avvio GUI su http://localhost:8080"
+( sleep 2; xdg-open http://localhost:8080 >/dev/null 2>&1 ) &
 cd "$GUI_DIR/backend"
 exec "$GUI_DIR/venv/bin/python" server.py
