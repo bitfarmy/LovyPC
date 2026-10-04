@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-04 — Il mount non rallenta più Fedora
+
+- Il default di `MOUNT_POINT` è `~/.local/share/lovypc/pc-windows`, non più `~/pc-windows`
+- `pcwin` e la GUI capiscono se è montato da `/proc/self/mountinfo`, senza `stat` sul FUSE
+- `pcwin monta` smonta il vecchio `~/pc-windows` e usa timeout SSH corti
+- Il ping di stato aspetta al massimo 1 secondo
+
 ## v7.1 (2026-10-04) — Fix end-to-end + servizio Ollama
 
 ### GUI v7

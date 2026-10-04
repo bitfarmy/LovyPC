@@ -423,7 +423,7 @@ async function loadConfig() {
         setInput('cfg-win-ip', data.WIN_IP);
         setInput('cfg-win-folder', data.WIN_FOLDER);
         // FIX 3: mostra default se MOUNT_POINT non è nel config
-        setInput('cfg-mount-point', data.MOUNT_POINT || '~/pc-windows (default)');
+        setInput('cfg-mount-point', data.MOUNT_POINT || '~/.local/share/lovypc/pc-windows (default)');
         addLog('Config loaded', 'info');
     } catch(e) {
         addLog('Config load failed: ' + e.message, 'error');

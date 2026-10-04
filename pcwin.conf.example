@@ -11,8 +11,11 @@ WIN_IP="192.168.1.x"
 # Usa / anche se è Windows. Lascia vuoto per montare C:/Users/%WIN_USER%
 WIN_FOLDER="C:/Users/NomeUtenteWindows"
 
-# --- Punto di mount sul Fedora (opzionale, default: ~/pc-windows) ---
-# MOUNT_POINT="$HOME/pc-windows"
+# --- Punto di mount sul Fedora (opzionale) ---
+# Default: ~/.local/share/lovypc/pc-windows
+# Non usare una cartella direttamente in ~/ : se Windows è spento, ls e
+# Nautilus si bloccano su quel punto.
+# MOUNT_POINT="$HOME/.local/share/lovypc/pc-windows"
 
 # --- Porte TramaMind (fisse) ---
 # OmniRoute : 20128 · OpenHands : 3000 · Ollama : 11434 (debug)

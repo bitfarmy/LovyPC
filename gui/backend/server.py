@@ -137,6 +137,49 @@ def save_config(new_values):
 
     logger.info(f'Config saved to {CONFIG_FILE} (backup: .bak)')
 
+# Fuori da ~/ : ls, Nautilus e i selettori file non aspettano un FUSE bloccato.
+DEFAULT_MOUNT = '~/.local/share/lovypc/pc-windows'
+LEGACY_MOUNT = '~/pc-windows'
+
+def expand_mount(raw):
+    """Percorso assoluto. Non fa stat sul punto di mount: un FUSE morto blocca stat."""
+    home = os.environ.get('HOME') or os.path.expanduser('~')
+    path = (raw or '').strip() or DEFAULT_MOUNT
+    path = path.replace('${HOME}', home).replace('$HOME', home)
+    if path.startswith('~'):
+        path = home + path[1:]
+    if not os.path.isabs(path):
+        path = os.path.join(home, path)
+    path = os.path.normpath(path)
+    parent = os.path.realpath(os.path.dirname(path))
+    return os.path.join(parent, os.path.basename(path))
+
+def is_mounted(path):
+    """True se path è un mount, da /proc/self/mountinfo. Non tocca il filesystem."""
+    want = expand_mount(path)
+    try:
+        with open('/proc/self/mountinfo', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 5:
+                    continue
+                mp = parts[4].replace('\\040', ' ').replace('\\011', '\t')
+                if mp == want:
+                    return True
+    except OSError as e:
+        logger.debug(f'mountinfo: {e}')
+    return False
+
+def active_mount(config):
+    """Punto configurato, oppure il vecchio ~/pc-windows se è ancora montato."""
+    point = expand_mount(config.get('MOUNT_POINT'))
+    if is_mounted(point):
+        return point, True
+    legacy = expand_mount(LEGACY_MOUNT)
+    if legacy != point and is_mounted(legacy):
+        return legacy, True
+    return point, False
+
 # ============ SERVICES ============
 def load_services():
     if not os.path.exists(SERVICES_FILE):
@@ -159,8 +202,8 @@ def get_status():
     network = False
     if win_ip:
         try:
-            r = subprocess.run(['ping', '-c1', '-W2', win_ip], 
-                             capture_output=True, timeout=3)
+            r = subprocess.run(['ping', '-c1', '-W1', win_ip],
+                             capture_output=True, timeout=2)
             network = r.returncode == 0
         except Exception as e:
             logger.debug(f'Ping failed: {e}')
@@ -228,9 +271,8 @@ def get_status():
                     'systemd_name': svc_tname
                 }
 
-    # Mount
-    mount_point = os.path.expanduser(config.get('MOUNT_POINT', '~/pc-windows'))
-    mounted = os.path.ismount(mount_point)
+    # Mount — mountinfo, non ismount: ismount fa stat e si blocca se Windows è spento
+    mount_point, mounted = active_mount(config)
 
     return {
         'network': network,
@@ -465,9 +507,9 @@ def api_setup_ssh():
 def api_open_folder():
     """Apre la cartella montata nel file manager"""
     config = load_config()
-    mount_point = os.path.expanduser(config.get('MOUNT_POINT', '~/pc-windows'))
+    mount_point, mounted = active_mount(config)
 
-    if not os.path.ismount(mount_point):
+    if not mounted:
         return jsonify({'success': False, 'error': 'Not mounted'}), 400
 
     xdg = shutil.which('xdg-open')

@@ -22,13 +22,47 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 source "$CONFIG_FILE"
 
-MOUNT_POINT="${MOUNT_POINT:-$HOME/pc-windows}"
+# Fuori da ~/ : ls, Nautilus e i selettori file non aspettano un FUSE bloccato.
+MOUNT_POINT="${MOUNT_POINT:-$HOME/.local/share/lovypc/pc-windows}"
+LEGACY_MOUNT="$HOME/pc-windows"
 USER_SYSTEMD="$HOME/.config/systemd/user"
-mkdir -p "$MOUNT_POINT"
+# Timeout corti: se Windows è spento, sshfs fallisce in pochi secondi.
+SSHFS_OPTS="reconnect,ConnectTimeout=2,ConnectionAttempts=1,ServerAliveInterval=5,ServerAliveCountMax=2,dir_cache=yes,entry_timeout=5,attr_timeout=5"
 
 # ---------- supporto ----------
 require() {
     command -v "$1" &>/dev/null || { echo "Manca: sudo dnf install $2"; exit 1; }
+}
+
+# True se path è un mount. Legge mountinfo: non fa stat sul FUSE
+# (un Windows spento blocca stat per tutto il timeout SSH).
+is_mounted() {
+    local parent base want
+    parent=$(dirname -- "$1")
+    base=$(basename -- "$1")
+    parent=$(realpath -m -- "$parent" 2>/dev/null) || return 1
+    want="$parent/$base"
+    awk -v want="$want" '
+        {
+            mp = $5
+            gsub(/\\040/, " ", mp)
+            gsub(/\\011/, "\t", mp)
+            if (mp == want) found = 1
+        }
+        END { exit found ? 0 : 1 }
+    ' /proc/self/mountinfo
+}
+
+# Smonta path se risulta in mountinfo. 0 ok, 1 errore, 2 non montato.
+smonta_path() {
+    local mp="$1"
+    is_mounted "$mp" || return 2
+    if fusermount3 -u "$mp" 2>/dev/null || fusermount3 -uz "$mp" 2>/dev/null; then
+        echo "Smontato: $mp"
+        return 0
+    fi
+    echo "❌ Non riesco a smontare $mp. Chiudi i programmi che la stanno usando."
+    return 1
 }
 
 check_reachable() {
@@ -214,18 +248,38 @@ case "$1" in
         ;;
     monta)
         require sshfs fuse-sshfs
-        if mountpoint -q "$MOUNT_POINT"; then
+        # Il vecchio punto è dentro la home: va via anche se Windows è spento.
+        if [ "$LEGACY_MOUNT" != "$MOUNT_POINT" ]; then
+            smonta_path "$LEGACY_MOUNT" || true
+        fi
+        if is_mounted "$MOUNT_POINT"; then
             echo "✅ Già montato in $MOUNT_POINT"
         else
             check_reachable
+            mkdir -p "$(dirname -- "$MOUNT_POINT")"
+            if [ ! -d "$MOUNT_POINT" ]; then
+                mkdir -- "$MOUNT_POINT"
+            fi
             sshfs "${WIN_USER}@${WIN_IP}:${WIN_FOLDER}" "$MOUNT_POINT" \
-                -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 \
-                && echo "✅ Montato in $MOUNT_POINT"
+                -o "$SSHFS_OPTS" \
+                && echo "✅ Montato in $MOUNT_POINT" \
+                || { echo "❌ Mount fallito."; exit 1; }
         fi
         ;;
     smonta)
-        fusermount3 -u "$MOUNT_POINT" 2>/dev/null && echo "Smontato." \
-            || echo "Niente da smontare."
+        any=0
+        fail=0
+        prev=""
+        for mp in "$MOUNT_POINT" "$LEGACY_MOUNT"; do
+            [ "$mp" = "$prev" ] && continue
+            prev="$mp"
+            smonta_path "$mp"
+            rc=$?
+            [ "$rc" -eq 0 ] && any=1
+            [ "$rc" -eq 1 ] && fail=1
+        done
+        [ "$any" -eq 0 ] && [ "$fail" -eq 0 ] && echo "Niente da smontare."
+        [ "$fail" -eq 1 ] && exit 1
         ;;
     gui)
         "$0" monta && xdg-open "$MOUNT_POINT" 2>/dev/null &
@@ -289,8 +343,14 @@ case "$1" in
             done
             echo "  💡 Service systemd non installati → pcwin installa-service"
         fi
-        mountpoint -q "$MOUNT_POINT" \
-            && echo "  🟢 Cartelle: montate in $MOUNT_POINT" || echo "  ⚪ Cartelle: non montate"
+        if is_mounted "$MOUNT_POINT"; then
+            echo "  🟢 Cartelle: montate in $MOUNT_POINT"
+        elif [ "$LEGACY_MOUNT" != "$MOUNT_POINT" ] && is_mounted "$LEGACY_MOUNT"; then
+            echo "  🟡 Cartelle: ancora in $LEGACY_MOUNT"
+            echo "     Rimonta con: pcwin monta  (le sposta fuori dalla home)"
+        else
+            echo "  ⚪ Cartelle: non montate"
+        fi
         ;;
     *)
         cat <<'EOF'
@@ -298,7 +358,7 @@ pcwin — Controlla il tuo PC Windows dal tuo Fedora
 
   pcwin term                 Terminale PowerShell sul PC Windows
   pcwin cmd                  Prompt cmd.exe remoto
-  pcwin monta | smonta       Monta/smonta le cartelle in ~/pc-windows
+  pcwin monta | smonta       Monta/smonta le cartelle in ~/.local/share/lovypc/pc-windows
   pcwin gui                  Monta e apri il Gestore file
   pcwin setup-ssh            Accesso senza password (chiave SSH, una tantum)
 

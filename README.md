@@ -1,24 +1,28 @@
-# 🖥️ LovyPC — Connettore universale PC Windows ↔ Fedora
+# LovyPC
 
 ![Version](https://img.shields.io/badge/version-7.4-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Fedora%20Linux-blue?style=flat-square)
 ![UI](https://img.shields.io/badge/UI-Win95%20Edition-c0c0c0?style=flat-square)
 
-**LovyPC collega il tuo PC Windows alla tua Fedora:** terminale remoto, cartelle
-montate via SSHFS e tunnel SSH per i tuoi servizi (TramaMind/OmniRoute,
-OpenHands, Ollama e qualunque altro servizio futuro).
+LovyPC connects a Windows PC to a Fedora machine on the same network. From Fedora you open a remote terminal, browse the Windows folders, and reach the services that run on Windows through SSH tunnels. The services included today are TramaMind (OmniRoute), OpenHands, and Ollama. You can add others later without changing the program.
 
-| Componente | Descrizione |
+**Descrizione**
+
+LovyPC collega il tuo PC Windows alla tua Fedora: terminale remoto, cartelle montate via SSHFS e tunnel SSH per i tuoi servizi (TramaMind/OmniRoute, OpenHands, Ollama e qualunque altro servizio futuro).
+
+| Piece | What it does |
 |---|---|
-| 🖥️ **`pcwin`** | CLI bash — terminale, mount, tunnel, service systemd, setup SSH |
-| 🪟 **`gui/`** | GUI web stile Win95 (Flask) — tab SYSTEM / SERVICES / CONFIG / LOGS |
+| `pcwin` | Command-line tool. Terminal, folder mount, tunnels, systemd services, SSH key setup. |
+| `gui/` | Small local web window in a Windows 95 style. Tabs: SYSTEM, SERVICES, CONFIG, LOGS. |
+
+The window listens only on your own computer, at <http://127.0.0.1:8080>. It has no login. Do not expose that address to the rest of the network.
 
 ---
 
-## 🚀 Avvio rapido
+## Start
 
-Un comando solo. Crea l'ambiente, installa le dipendenze, sincronizza `pcwin` e avvia la GUI:
+One command creates the Python environment, installs the dependencies, copies `pcwin` into `~/.local/bin`, and opens the window:
 
 ```bash
 git clone https://github.com/bitfarmy/LovyPC.git
@@ -26,101 +30,128 @@ cd LovyPC
 bash gui/start.sh
 ```
 
-Poi apri **http://localhost:8080** e configura dalla tab **CONFIG** (User, IP, cartella del PC Windows).
-
-> Da ora in poi, ogni aggiornamento è solo:
-> ```bash
-> git pull && bash gui/start.sh
-> ```
-
----
-
-## ⚙️ Configurazione (prima volta)
-
-1. Apri la GUI → tab **CONFIG** → inserisci **Windows User**, **Windows IP**, **Shared Folder** → **SAVE**
-   (la GUI crea da sola `~/.config/pcwin.conf`)
-2. Tab **CONFIG** → **SETUP SSH** → inserisci la password Windows **una volta sola**
-   (configura la chiave SSH e i permessi su Windows, incluso il caso utente amministratore)
-3. Tab **SYSTEM** → **MOUNT** per montare le cartelle
-
-Oppure a mano:
+Fedora needs `sshfs`:
 
 ```bash
-mkdir -p ~/.config && cp pcwin.conf.example ~/.config/pcwin.conf
-# modifica WIN_USER, WIN_IP, WIN_FOLDER
-pcwin setup-ssh   # accesso senza password, una tantum
+sudo dnf install sshfs
 ```
 
-> ⚠️ Prerequisiti: `sshfs` (`sudo dnf install sshfs`) e **OpenSSH Server attivo sul PC Windows**.
+Windows needs the OpenSSH Server feature turned on.
+
+After the first run, this is enough to pick up later changes:
+
+```bash
+git pull && bash gui/start.sh
+```
+
+If the window is already open, close it first. Closing the browser tab leaves the server running, and `start.sh` will only open the browser again. Stop the server with Ctrl+C in the terminal where you started it, then run `start.sh` once more.
 
 ---
 
-## 🖥️ GUI — Tab
+## First visit
 
-| Tab | Contenuto |
+1. Open the CONFIG tab. Fill in the Windows user, the Windows IP address, and the Windows folder you want to see. Save. The program writes `~/.config/pcwin.conf` for you.
+2. On the same tab, choose SETUP SSH and type the Windows password once. LovyPC installs an SSH key and fixes the file permissions on Windows, including the extra file Windows uses for administrator accounts.
+3. Open the SYSTEM tab and choose MOUNT.
+
+You can do the same from the terminal:
+
+```bash
+mkdir -p ~/.config
+cp pcwin.conf.example ~/.config/pcwin.conf
+# edit WIN_USER, WIN_IP, and WIN_FOLDER
+pcwin setup-ssh
+pcwin monta
+```
+
+An example config lives in `pcwin.conf.example`.
+
+---
+
+## Where the Windows folders appear
+
+The Windows disk is mounted at:
+
+```text
+~/.local/share/lovypc/pc-windows
+```
+
+That path is intentional. An earlier version used `~/pc-windows`, a folder sitting directly inside your home directory. Fedora looks through the home directory all the time: the file manager, the save dialogs, and the shell. When Windows was asleep or switched off, each of those lookups waited on the dead connection, and typing and window movement felt late. The mount now lives one step away from that traffic.
+
+`pcwin monta` also removes a leftover mount at `~/pc-windows` if it finds one. The empty `~/pc-windows` directory, if it is still there, is only a local folder.
+
+You can choose another path with `MOUNT_POINT` in `~/.config/pcwin.conf`. Keep it out of the top of your home directory. The CONFIG tab shows the path and does not let you change it from the window, because a value typed there would not expand `$HOME`.
+
+While the disk is mounted, LovyPC checks `/proc/self/mountinfo` instead of asking the disk itself whether it is there. A sleeping Windows PC cannot stall that check. SSH gives up after a few seconds if the PC does not answer.
+
+---
+
+## The window
+
+| Tab | What you find there |
 |---|---|
-| **SYSTEM** | LED network/mount, terminale remoto, mount/unmount, open folder, refresh |
-| **SERVICES** | Card dinamiche da `services.yaml` — CONNECT/DISCONNECT per singolo tunnel o intero servizio |
-| **CONFIG** | WIN_USER, WIN_IP, WIN_FOLDER (MOUNT_POINT readonly) + **SETUP SSH** |
-| **LOGS** | Log operazioni in tempo reale |
+| SYSTEM | Network and mount lights, remote terminal, mount and unmount, open the folder, refresh. |
+| SERVICES | One card for each entry in `services.yaml`. Connect or disconnect a single tunnel, or the whole service. |
+| CONFIG | Windows user, IP address, and folder. The mount path is shown and is not editable here. SETUP SSH is on this tab. |
+| LOGS | What the window just did. |
 
-### API backend
+### HTTP routes
 
-| Route | Metodo | Descrizione |
+| Route | Method | Purpose |
 |---|---|---|
-| `/api/health` | GET | Health check (versione, pcwin_found) |
-| `/api/status` | GET | Stato completo (network, tunnels, mount) |
-| `/api/services` | GET | Lista servizi da services.yaml |
-| `/api/config` | GET/POST | Leggi/Scrivi config (MOUNT_POINT readonly) |
-| `/api/connect/<svc>/<tunnel>` | POST | Connetti tunnel specifico |
-| `/api/disconnect/<svc>/<tunnel>` | POST | Disconnetti tunnel specifico |
-| `/api/connect/service/<svc>` | POST | Connetti tutti i tunnel di un servizio |
-| `/api/disconnect/service/<svc>` | POST | Disconnetti tutti i tunnel |
-| `/api/mount` `/api/unmount` | POST | Mount/Unmount SSHFS |
-| `/api/setup-ssh` | POST | Setup chiave SSH (apre terminale se serve password) |
-| `/api/open-terminal` | POST | Terminale con `pcwin term` (ptyxis → gnome-terminal) |
-| `/api/open-folder` | POST | File manager sul mount point |
-| `/api/auto/<svc>/<tunnel>/<action>` | POST | Avvio automatico (auto/noauto) |
-
-> 🔒 **Sicurezza**: la GUI è un tool locale senza autenticazione. Gira solo su
-> `127.0.0.1:8080` — non esporla su rete esterna.
+| `/api/health` | GET | The server is up. Reports the version and whether `pcwin` was found. |
+| `/api/status` | GET | Network, tunnels, and mount. |
+| `/api/services` | GET | Services listed in `services.yaml`. |
+| `/api/config` | GET, POST | Read or write the config. `MOUNT_POINT` is left untouched. |
+| `/api/connect/<svc>/<tunnel>` | POST | Open one tunnel. |
+| `/api/disconnect/<svc>/<tunnel>` | POST | Close one tunnel. |
+| `/api/connect/service/<svc>` | POST | Open every tunnel of a service. |
+| `/api/disconnect/service/<svc>` | POST | Close every tunnel of a service. |
+| `/api/mount`, `/api/unmount` | POST | Mount or unmount the Windows folders. |
+| `/api/setup-ssh` | POST | Install the SSH key. Opens a terminal if Windows asks for the password. |
+| `/api/open-terminal` | POST | Open a terminal with `pcwin term`. Ptyxis is preferred, then GNOME Terminal. |
+| `/api/open-folder` | POST | Open the mounted folder in the file manager. |
+| `/api/auto/<svc>/<tunnel>/<action>` | POST | Turn automatic start on or off (`auto` or `noauto`). |
 
 ---
 
-## ⌨️ CLI `pcwin`
+## The `pcwin` command
 
 ```bash
-pcwin term                 # SSH PowerShell sul PC Windows
-pcwin cmd                  # SSH cmd.exe remoto
-pcwin monta | smonta       # Mount/Unmount SSHFS in ~/pc-windows
-pcwin gui                  # Monta e apri il gestore file
-pcwin setup-ssh            # Accesso senza password (chiave SSH, una tantum)
+pcwin term                 # PowerShell on the Windows PC
+pcwin cmd                  # cmd.exe on the Windows PC
+pcwin monta | smonta       # mount or unmount ~/.local/share/lovypc/pc-windows
+pcwin gui                  # mount, then open the file manager
+pcwin setup-ssh            # one-time SSH key, so later commands need no password
 
-pcwin tramamind            # Tunnel → OmniRoute :20128 (endpoint principale)
-pcwin tramamind stop       # Ferma il tunnel
-pcwin tramamind auto       # Avvio automatico al login (systemd user)
-pcwin tramamind noauto     # Disattiva avvio automatico
-pcwin tramamind ui         # Tunnel → OpenHands :3000
-pcwin tramamind ui stop    # Ferma OpenHands
+pcwin tramamind            # tunnel to OmniRoute on port 20128
+pcwin tramamind stop
+pcwin tramamind auto       # start that tunnel at login
+pcwin tramamind noauto
+pcwin tramamind ui         # tunnel to OpenHands on port 3000
+pcwin tramamind ui stop
 
-pcwin ollama               # Tunnel → Ollama :11434 (solo debug)
-pcwin omniroute            # Alias di tramamind (retrocompatibilità)
+pcwin ollama               # tunnel to Ollama on port 11434, for debugging
+pcwin omniroute            # old name for tramamind
 
-pcwin installa-service     # Crea i service systemd user (persistenza anche senza login)
-pcwin disinstalla-service  # Rimuovi service e PID file
-pcwin status               # Panoramica completa
+pcwin installa-service     # install the user systemd units
+pcwin disinstalla-service
+pcwin status
 ```
 
-Funziona anche **senza systemd user**: i tunnel vengono avviati come processi
-SSH in background con PID file in `~/.local/state/pcwin/` — la GUI rileva
-entrambe le modalità.
+Systemd is optional. Without it, the tunnels are ordinary SSH processes. Their process ids are stored in `~/.local/state/pcwin/`, and the window notices them there too. With the units installed, a tunnel that drops while Windows is on comes back after a few seconds. If Windows is off, the unit stops retrying instead of pinging forever.
+
+Logs, once the units exist:
+
+```bash
+journalctl --user -u pcwin-tramamind -f
+```
 
 ---
 
-## ➕ Aggiungere un servizio
+## Add a service
 
-Modifica `gui/backend/services.yaml` aggiungendo un blocco — la GUI lo
-rileva automaticamente al prossimo refresh, **senza toccare codice**:
+Edit `gui/backend/services.yaml`. The window picks up the new card on the next refresh. You do not need to change the Python or the page.
 
 ```yaml
 services:
@@ -132,46 +163,45 @@ services:
       - name: main
         display: Main
         port: 8080
-        pcwin_cmd: "custom tunnel command"   # eseguito come: pcwin <cmd> [stop|auto|noauto]
+        pcwin_cmd: "custom tunnel command"   # run as: pcwin <cmd> [stop|auto|noauto]
         url: http://localhost:8080
 ```
 
-- Il nome del service systemd è costruito da `pcwin_cmd`:
-  `"tramamind"` → `pcwin-tramamind.service`, `"tramamind ui"` → `pcwin-tramamind-ui.service`
-- Il frontend renderizza la nuova card automaticamente al prossimo polling
+The systemd unit name comes from `pcwin_cmd`. `"tramamind"` becomes `pcwin-tramamind.service`. `"tramamind ui"` becomes `pcwin-tramamind-ui.service`.
 
 ---
 
-## 🧩 Struttura del repo
+## Layout
 
-```
+```text
 LovyPC/
-├── pcwin                  # CLI bash
-├── pcwin.conf.example     # Config di esempio
-├── pcwin.desktop          # Launcher desktop
-├── gui/                   # GUI web (Flask + Win95)
-│   ├── start.sh           # Avvio one-command (venv + deps + sync pcwin)
-│   ├── backend/           # server.py + services.yaml
+├── pcwin                  # command-line tool
+├── pcwin.conf.example     # sample config
+├── pcwin.desktop          # desktop launcher
+├── gui/
+│   ├── start.sh           # one command: environment, dependencies, pcwin, window
+│   ├── backend/           # server.py and services.yaml
 │   ├── frontend/          # index.html, css/, js/
 │   └── requirements.txt
-├── ARCHITECTURE.md        # Architettura e API backend
+├── ARCHITECTURE.md
 ├── CHANGELOG.md
 └── LICENSE                # MIT
 ```
 
 ---
 
-## 🔧 Risoluzione problemi
+## When something fails
 
-| Problema | Causa | Soluzione |
+| What you see | What it usually means | What to do |
 |---|---|---|
-| MOUNT va in timeout (15s) | SSH chiede la password | `pcwin setup-ssh` (o pulsante SETUP SSH nella GUI) |
-| Setup SSH: "verifica non riuscita" | Utente Windows amministratore | Già gestito: la chiave va anche in `administrators_authorized_keys` — riesegui `pcwin setup-ssh` |
-| URL tunnel non risponde | Servizio non avviato su Windows | Avvia TramaMind/OpenHands sul PC Windows, poi CONNECT |
-| GUI non si apre | Backend non avviato | `bash gui/start.sh` e controlla il terminale |
+| MOUNT sits there and then stops after about 15 seconds | SSH is still asking for a password | Run `pcwin setup-ssh`, or use SETUP SSH in the window |
+| Setup SSH says the check did not pass | The Windows user is an administrator | Run `pcwin setup-ssh` again. The key is also written to `administrators_authorized_keys` |
+| A tunnel address does not answer | The program is not running on Windows | Start TramaMind or OpenHands on Windows, then connect again |
+| The window does not open | The server is not running | Run `bash gui/start.sh` and read the terminal |
+| Fedora feels slow while LovyPC is open | An old mount is still at `~/pc-windows` | Close LovyPC and run `pcwin smonta`, then `pcwin monta` |
 
 ---
 
-## Licenza
+## License
 
-MIT — vedi [LICENSE](LICENSE)
+MIT. See [LICENSE](LICENSE).
