@@ -1,7 +1,13 @@
 #!/bin/bash
 # ============================================================
 # pcwin — Controlla il tuo PC Windows da Fedora
-# term | monta | smonta | ollama | omniroute | gui | status
+# Client remoto di TramaMind (https://github.com/bitfarmy/tramamind)
+#
+# Comandi:
+#   term | cmd | monta | smonta | gui | status
+#   tramamind [stop|auto|noauto]   → tunnel OmniRoute :20128
+#   tramamind ui [stop]            → tunnel OpenHands :3000
+#   ollama [stop]                  → tunnel Ollama :11434 (debug)
 # ============================================================
 
 CONFIG_FILE="${PCWIN_CONFIG:-$HOME/.config/pcwin.conf}"
@@ -9,59 +15,135 @@ CONFIG_FILE="${PCWIN_CONFIG:-$HOME/.config/pcwin.conf}"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Config non trovata: $CONFIG_FILE"
     echo "Copia l'esempio:  cp pcwin.conf.example ~/.config/pcwin.conf"
-    echo "e modifica IP/nome utente."
     exit 1
 fi
 source "$CONFIG_FILE"
 
 MOUNT_POINT="${MOUNT_POINT:-$HOME/pc-windows}"
-PID_DIR="$HOME/.local/state/pcwin"
-mkdir -p "$PID_DIR" "$MOUNT_POINT"
+USER_SYSTEMD="$HOME/.config/systemd/user"
+mkdir -p "$MOUNT_POINT"
 
-# ---------- funzioni di supporto ----------
+# ---------- supporto ----------
 require() {
-    if ! command -v "$1" &>/dev/null; then
-        echo "Manca il pacchetto: sudo dnf install $2"
-        exit 1
-    fi
+    command -v "$1" &>/dev/null || { echo "Manca: sudo dnf install $2"; exit 1; }
 }
 
 check_reachable() {
-    if ! ping -c1 -W2 "$WIN_IP" &>/dev/null; then
-        echo "⚠️  PC Windows ($WIN_IP) non raggiungibile. Controlla rete/firewall."
+    ping -c1 -W2 "$WIN_IP" &>/dev/null || {
+        echo "⚠️  PC Windows ($WIN_IP) non raggiungibile."
         exit 1
-    fi
+    }
+}
+
+# Gestione tunnel: systemd se disponibile, altrimenti PID file
+use_systemd() {
+    [ -d "$USER_SYSTEMD" ] && systemctl --user list-unit-files 2>/dev/null | grep -q "^pcwin-"
 }
 
 tunnel_start() {
-    local name="$1" lport="$2" rport="$3" pidfile="$PID_DIR/$name.pid"
-    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
-        echo "✅ Tunnel $name già attivo (porta locale $lport)."
-        return
+    local name="$1" lport="$2" rport="$3"
+    if use_systemd; then
+        systemctl --user start "pcwin-$name.service" 2>/dev/null \
+            && echo "✅ pcwin-$name.service avviato → http://localhost:$lport"
+    else
+        local pidfile="$HOME/.local/state/pcwin/$name.pid"
+        mkdir -p "$(dirname "$pidfile")"
+        if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+            echo "✅ Tunnel $name già attivo (porta $lport)."
+            return
+        fi
+        check_reachable
+        ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+            -L "$lport:localhost:$rport" "$WIN_USER@$WIN_IP" &
+        echo $! > "$pidfile"
+        echo "✅ Tunnel $name avviato → http://localhost:$lport"
     fi
-    check_reachable
-    ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
-        -L "$lport:localhost:$rport" "$WIN_USER@$WIN_IP" &
-    echo $! > "$pidfile"
-    echo "✅ Tunnel $name avviato → http://localhost:$lport (dal tuo Fedora)"
 }
 
 tunnel_stop() {
-    local name="$1" pidfile="$PID_DIR/$name.pid"
-    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
-        kill "$(cat "$pidfile")" && rm -f "$pidfile"
-        echo "🛑 Tunnel $name fermato."
+    local name="$1"
+    if use_systemd; then
+        systemctl --user stop "pcwin-$name.service" 2>/dev/null \
+            && echo "🛑 pcwin-$name.service fermato."
     else
-        echo "Tunnel $name non era attivo."
-        rm -f "$pidfile"
+        local pidfile="$HOME/.local/state/pcwin/$name.pid"
+        [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null && rm -f "$pidfile" \
+            && echo "🛑 Tunnel $name fermato." || echo "Tunnel $name non attivo."
     fi
+}
+
+tunnel_auto() {
+    local name="$1" action="$2"
+    if ! use_systemd; then
+        echo "I service systemd non sono installati. Esegui prima:"
+        echo "  pcwin installa-service"
+        exit 1
+    fi
+    systemctl --user "$action" "pcwin-$name.service"
+    echo "$([ "$action" = enable ] && echo '🔁 Avvio automatico attivo' || echo '⏸️  Avvio automatico disattivo') per pcwin-$name"
+}
+
+# Genera i file .service systemd user
+installa_service() {
+    mkdir -p "$USER_SYSTEMD"
+    cat > "$USER_SYSTEMD/pcwin-tramamind.service" <<EOF
+[Unit]
+Description=LovyPC tunnel → TramaMind OmniRoute ($WIN_IP:20128)
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 20128:localhost:20128 $WIN_USER@$WIN_IP
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+    cat > "$USER_SYSTEMD/pcwin-tramamind-ui.service" <<EOF
+[Unit]
+Description=LovyPC tunnel → TramaMind OpenHands ($WIN_IP:3000)
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 3000:localhost:3000 $WIN_USER@$WIN_IP
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+    cat > "$USER_SYSTEMD/pcwin-ollama.service" <<EOF
+[Unit]
+Description=LovyPC tunnel → Ollama ($WIN_IP:11434) — debug
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 11434:localhost:11434 $WIN_USER@$WIN_IP
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+    systemctl --user daemon-reload
+    echo "✅ Service installati in $USER_SYSTEMD"
+    echo "   pcwin tramamind        → avvia/disattiva on-demand"
+    echo "   pcwin tramamind auto   → avvio automatico al login"
 }
 
 # ---------- comandi ----------
 case "$1" in
     term)
         check_reachable
-        echo "Connessione a $WIN_USER@$WIN_IP (PowerShell remoto)..."
         ssh "$WIN_USER@$WIN_IP"
         ;;
     cmd)
@@ -69,60 +151,98 @@ case "$1" in
         ssh "$WIN_USER@$WIN_IP" "cmd"
         ;;
     monta)
-        require sshfs sshfs
+        require sshfs fuse-sshfs
         if mountpoint -q "$MOUNT_POINT"; then
             echo "✅ Già montato in $MOUNT_POINT"
         else
             check_reachable
             sshfs "${WIN_USER}@${WIN_IP}:${WIN_FOLDER}" "$MOUNT_POINT" \
-                && echo "✅ Cartelle Windows montate in $MOUNT_POINT"
+                -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 \
+                && echo "✅ Montato in $MOUNT_POINT"
         fi
         ;;
     smonta)
-        fusermount -u "$MOUNT_POINT" 2>/dev/null \
-            && echo "Smontato." || echo "Niente da smontare (o errore)."
+        fusermount3 -u "$MOUNT_POINT" 2>/dev/null && echo "Smontato." \
+            || echo "Niente da smontare."
         ;;
     gui)
         "$0" monta && xdg-open "$MOUNT_POINT" 2>/dev/null &
+        ;;
+    tramamind)
+        case "$2" in
+            stop)   tunnel_stop tramamind ;;
+            auto)   tunnel_auto tramamind enable ;;
+            noauto) tunnel_auto tramamind disable ;;
+            ui)     case "$3" in
+                        stop) tunnel_stop tramamind-ui ;;
+                        *)    tunnel_start tramamind-ui 3000 3000
+                              echo "   OpenHands → http://localhost:3000" ;;
+                    esac ;;
+            *)      tunnel_start tramamind 20128 20128
+                    echo "   OmniRoute → http://localhost:20128"
+                    echo "   Esporta:  export OPENAI_BASE_URL=http://localhost:20128/v1" ;;
+        esac
         ;;
     ollama)
         case "$2" in
             stop) tunnel_stop ollama ;;
             *)    tunnel_start ollama 11434 11434
-                  echo "   Usa:  export OLLAMA_HOST=http://localhost:11434"
-                  echo "   poi:  ollama list / ollama run <modello>" ;;
+                  echo "   Ollama → http://localhost:11434 (debug diretto)" ;;
         esac
         ;;
     omniroute)
-        case "$2" in
-            stop) tunnel_stop omniroute ;;
-            *)    tunnel_start omniroute "${OMNI_LOCAL_PORT:-7337}" "${OMNI_REMOTE_PORT:-7337}"
-                  echo "   OmniRoute → http://localhost:${OMNI_LOCAL_PORT:-7337}" ;;
-        esac
+        echo "ℹ️  'omniroute' è ora 'tramamind' — uso il nuovo nome."
+        "$0" tramamind "${@:2}"
+        ;;
+    installa-service)
+        installa_service
         ;;
     status)
         echo "PC Windows: $WIN_USER@$WIN_IP  (cartella: $WIN_FOLDER)"
-        ping -c1 -W2 "$WIN_IP" &>/dev/null && echo "  🟢 Rete: raggiungibile" || echo "  🔴 Rete: NON raggiungibile"
-        for t in ollama omniroute; do
-            [ -f "$PID_DIR/$t.pid" ] && kill -0 "$(cat "$PID_DIR/$t.pid")" 2>/dev/null \
-                && echo "  🟢 Tunnel $t: attivo" || echo "  ⚪ Tunnel $t: spento"
-        done
-        mountpoint -q "$MOUNT_POINT" && echo "  🟢 Cartelle: montate in $MOUNT_POINT" || echo "  ⚪ Cartelle: non montate"
+        ping -c1 -W2 "$WIN_IP" &>/dev/null \
+            && echo "  🟢 Rete: raggiungibile" || echo "  🔴 Rete: NON raggiungibile"
+        if use_systemd; then
+            for s in tramamind tramamind-ui ollama; do
+                local_state=$(systemctl --user is-active "pcwin-$s.service" 2>/dev/null)
+                enabled=$(systemctl --user is-enabled "pcwin-$s.service" 2>/dev/null)
+                case "$local_state" in
+                    active)   echo "  🟢 pcwin-$s: attivo $([ "$enabled" = enabled ] && echo '(auto)')" ;;
+                    failed)   echo "  🔴 pcwin-$s: fallito (Windows spento?)" ;;
+                    *)        echo "  ⚪ pcwin-$s: $local_state" ;;
+                esac
+            done
+        else
+            for t in tramamind tramamind-ui ollama; do
+                pidf="$HOME/.local/state/pcwin/$t.pid"
+                [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null \
+                    && echo "  🟢 Tunnel $t: attivo" || echo "  ⚪ Tunnel $t: spento"
+            done
+            echo "  💡 Service systemd non installati → pcwin installa-service"
+        fi
+        mountpoint -q "$MOUNT_POINT" \
+            && echo "  🟢 Cartelle: montate in $MOUNT_POINT" || echo "  ⚪ Cartelle: non montate"
         ;;
     *)
         cat <<'EOF'
-pcwin — Controlla il PC Windows dal tuo Fedora
+pcwin — Controlla il PC Windows dal tuo Fedora (client TramaMind)
 
-  pcwin term          Apri il terminale (PowerShell) del PC Windows
-  pcwin cmd           Apri cmd.exe remoto
-  pcwin monta         Monta le cartelle Windows in ~/pc-windows
-  pcwin smonta        Smonta le cartelle
-  pcwin gui           Monta e apri il Gestore file
-  pcwin ollama        Avvia il tunnel verso Ollama del PC Windows
-  pcwin ollama stop   Ferma il tunnel Ollama
-  pcwin omniroute     Avvia il tunnel verso OmniRoute del PC Windows
-  pcwin omniroute stop
-  pcwin status        Panoramica di tutto
+  pcwin term                 Terminale PowerShell sul PC Windows
+  pcwin cmd                  Prompt cmd.exe remoto
+  pcwin monta | smonta       Monta/smonta le cartelle in ~/pc-windows
+  pcwin gui                  Monta e apri il Gestore file
+
+  pcwin tramamind            Tunnel → OmniRoute :20128 (endpoint principale)
+  pcwin tramamind stop       Ferma il tunnel
+  pcwin tramamind auto       Avvio automatico al login (systemd)
+  pcwin tramamind noauto     Disattiva avvio automatico
+  pcwin tramamind ui         Tunnel → OpenHands :3000
+  pcwin tramamind ui stop
+
+  pcwin ollama               Tunnel → Ollama :11434 (solo debug)
+  pcwin omniroute            Alias di tramamind (retrocompatibilità)
+
+  pcwin installa-service     Crea i service systemd user
+  pcwin status               Panoramica completa
 
 Config: ~/.config/pcwin.conf
 EOF

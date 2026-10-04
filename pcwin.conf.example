@@ -7,7 +7,3 @@ WIN_FOLDER="C:/Users/NomeUtenteWindows"
 
 # Dove montarla sul Fedora
 MOUNT_POINT="$HOME/pc-windows"
-
-# Porte OmniRoute (default: 7337)
-OMNI_LOCAL_PORT=7337
-OMNI_REMOTE_PORT=7337

@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=PC Windows
-Comment=Terminale e cartelle del PC Windows
-Exec=gnome-terminal -- bash -c "pcwin term; exec bash"
+Name=LovyPC
+Comment=Controlla il tuo PC Windows e TramaMind
+Exec=gnome-terminal -- bash -c "pcwin status; exec bash"
 Icon=preferences-system-network
 Terminal=false
 Type=Application
