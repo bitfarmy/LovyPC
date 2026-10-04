@@ -10,19 +10,21 @@ echo "╔═══════════════════════�
 echo "║     LovyPC GUI — Avvio                   ║"
 echo "╚══════════════════════════════════════════╝"
 
-# 1. pcwin: se non in PATH, lo installiamo da soli in ~/.local/bin
-if ! command -v pcwin &>/dev/null; then
-    if [ -f "$REPO_DIR/pcwin" ]; then
-        mkdir -p "$HOME/.local/bin"
+# 1. pcwin: sincronizza SEMPRE la copia del repo in ~/.local/bin
+#    (~/.local/bin ha precedenza sul PATH → niente sudo, aggiornamenti automatici)
+if [ -f "$REPO_DIR/pcwin" ]; then
+    mkdir -p "$HOME/.local/bin"
+    if ! cmp -s "$REPO_DIR/pcwin" "$HOME/.local/bin/pcwin" 2>/dev/null; then
         cp "$REPO_DIR/pcwin" "$HOME/.local/bin/pcwin"
         chmod +x "$HOME/.local/bin/pcwin"
-        echo "[OK] pcwin installato in ~/.local/bin"
+        echo "[OK] pcwin aggiornato in ~/.local/bin"
     else
-        echo "[WARN] pcwin non trovato nel repo"
+        echo "[OK] pcwin aggiornato (~/.local/bin)"
     fi
 else
-    echo "[OK] pcwin trovato: $(command -v pcwin)"
+    echo "[WARN] pcwin non trovato nel repo"
 fi
+export PATH="$HOME/.local/bin:$PATH"
 
 # 2. venv: lo creiamo se manca
 if [ ! -d "$GUI_DIR/venv" ]; then
