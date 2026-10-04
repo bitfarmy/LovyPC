@@ -74,7 +74,14 @@ if ! "$GUI_DIR/venv/bin/python" -c "import flask, flask_cors, yaml" &>/dev/null;
     "$GUI_DIR/venv/bin/pip" install -q -r "$GUI_DIR/requirements.txt"
 fi
 
-# 4. avvia il server (e apri il browser dopo 2s)
+# 4. se il server gira già, apri solo il browser e basta
+if curl -sf http://localhost:8080/api/health >/dev/null 2>&1; then
+    echo "[OK] GUI già attiva su http://localhost:8080 — apertura browser"
+    xdg-open http://localhost:8080 >/dev/null 2>&1
+    exit 0
+fi
+
+# 5. avvia il server (e apri il browser dopo 2s)
 echo "[OK] Avvio GUI su http://localhost:8080"
 ( sleep 2; xdg-open http://localhost:8080 >/dev/null 2>&1 ) &
 cd "$GUI_DIR/backend"
