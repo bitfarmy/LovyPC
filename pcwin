@@ -64,20 +64,26 @@ setup_ssh() {
     fi
 
     # 3. Installa la chiave sul Windows (chiede la password Windows UNA volta)
+    #    + corregge i permessi (sshd di Windows rifiuta chiavi con ACL troppo aperte)
     echo "[..] Installazione chiave su $WIN_USER@$WIN_IP"
     echo "     (inserisci la password Windows UNA volta)"
     local pub
     pub=$(cat "$key.pub")
     ssh -o StrictHostKeyChecking=accept-new "$WIN_USER@$WIN_IP" \
-        "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path 'C:/Users/$WIN_USER/.ssh' | Out-Null; if (-not (Test-Path 'C:/Users/$WIN_USER/.ssh/authorized_keys')) { New-Item -ItemType File -Path 'C:/Users/$WIN_USER/.ssh/authorized_keys' | Out-Null }; if (-not (Select-String -Path 'C:/Users/$WIN_USER/.ssh/authorized_keys' -Pattern ([regex]::Escape('$pub')) -Quiet -ErrorAction SilentlyContinue)) { Add-Content -Path 'C:/Users/$WIN_USER/.ssh/authorized_keys' -Value '$pub' }\"" \
+        "powershell -NoProfile -Command \"\$d='C:/Users/$WIN_USER/.ssh'; New-Item -ItemType Directory -Force -Path \$d | Out-Null; \$f=(\$d+'/authorized_keys'); if (-not (Test-Path \$f)) { New-Item -ItemType File -Path \$f | Out-Null }; \$k='$pub'; \$c=Get-Content \$f -Raw -ErrorAction SilentlyContinue; if ((\$null -eq \$c) -or (\$c.IndexOf(\$k) -lt 0)) { Add-Content -Path \$f -Value \$k }; icacls \$f /inheritance:r /grant '$WIN_USER:F' | Out-Null; icacls \$d /inheritance:r /grant '$WIN_USER:F' | Out-Null\"" \
         || { echo "❌ Installazione chiave fallita."; exit 1; }
 
-    # 4. Verifica
+    # 4. Verifica (con diagnostica in caso di fallimento)
     if ssh -o BatchMode=yes -o PasswordAuthentication=no "$WIN_USER@$WIN_IP" exit 2>/dev/null; then
         echo "✅ Fatto: login SSH senza password attivo."
     else
-        echo "⚠️  Chiave installata ma la verifica non è riuscita."
-        echo "    Su Windows controlla: C:\\Users\\$WIN_USER\\.ssh\\authorized_keys"
+        echo "⚠️  Verifica non riuscita. Diagnostica:"
+        ssh -vv -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=5 \
+            "$WIN_USER@$WIN_IP" exit 2>&1 \
+            | grep -iE "refused|denied|unprotected|bad ownership|too open|authentications that can continue" \
+            | head -4 | sed 's/^/     /'
+        echo "    Se il problema sono i permessi, setup-ssh ha già provato a correggerli."
+        echo "    Su Windows verifica manualmente: C:\\Users\\$WIN_USER\\.ssh\\authorized_keys"
         exit 1
     fi
 }
