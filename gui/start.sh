@@ -45,6 +45,23 @@ else
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
+# 1b. Icona nel menu Applicazioni: installata/aggiornata automaticamente
+DESKTOP_FILE="$HOME/.local/share/applications/lovypc-gui.desktop"
+DESKTOP_CONTENT="[Desktop Entry]
+Name=LovyPC GUI
+Comment=Connettore universale PC Windows ↔ Fedora — GUI Win95
+Exec=bash -c \"nohup $GUI_DIR/start.sh >/dev/null 2>&1 &\"
+Icon=computer
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+Keywords=windows;ssh;tunnel;lovypc;pcwin;"
+if [ ! -f "$DESKTOP_FILE" ] || ! cmp -s <(printf '%s\n' "$DESKTOP_CONTENT") "$DESKTOP_FILE" 2>/dev/null; then
+    mkdir -p "$HOME/.local/share/applications"
+    printf '%s\n' "$DESKTOP_CONTENT" > "$DESKTOP_FILE"
+    echo "[OK] Icona nel menu Applicazioni installata"
+fi
+
 # 2. venv: lo creiamo se manca
 if [ ! -d "$GUI_DIR/venv" ]; then
     echo "[..] Creazione ambiente virtuale..."
