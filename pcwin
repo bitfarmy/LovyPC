@@ -65,6 +65,7 @@ setup_ssh() {
 
     # 3. Installa la chiave sul Windows (chiede la password Windows UNA volta)
     #    + corregge i permessi (sshd di Windows rifiuta chiavi con ACL troppo aperte)
+    #    + gestisce anche gli utenti amministratori (administrators_authorized_keys)
     echo "[..] Installazione chiave su $WIN_USER@$WIN_IP"
     echo "     (inserisci la password Windows UNA volta)"
     local pub
@@ -133,9 +134,13 @@ tunnel_auto() {
 
 installa_service() {
     mkdir -p "$USER_SYSTEMD"
+    # Windows ACCESO: tunnel su; se cade (router, sospensione, reboot) →
+    # riconnessione automatica rapida (RestartSec=10).
+    # Windows SPENTO: max 2 tentativi poi silenzio assoluto (StartLimit):
+    # niente ping né processi in background fino al prossimo login o a CONNECT.
     local common="After=network-online.target
-StartLimitIntervalSec=300
-StartLimitBurst=10
+StartLimitIntervalSec=60
+StartLimitBurst=2
 
 [Service]
 Type=simple
@@ -289,7 +294,7 @@ case "$1" in
         ;;
     *)
         cat <<'EOF'
-pcwin — Controlla il PC Windows dal tuo Fedora
+pcwin — Controlla il tuo PC Windows dal tuo Fedora
 
   pcwin term                 Terminale PowerShell sul PC Windows
   pcwin cmd                  Prompt cmd.exe remoto
