@@ -1,0 +1,5 @@
+pcwin.conf
+*.pid
+__pycache__/
+venv/
+*.bak

@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # pcwin — Controlla il tuo PC Windows da Fedora
-# Client remoto di TramaMind (https://github.com/bitfarmy/tramamind)
+# Client remoto universale: terminale, cartelle, tunnel servizi
 #
 # Comandi:
 #   term | cmd | monta | smonta | gui | status
@@ -16,6 +16,7 @@ CONFIG_FILE="${PCWIN_CONFIG:-$HOME/.config/pcwin.conf}"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Config non trovata: $CONFIG_FILE"
     echo "Copia l'esempio:  cp pcwin.conf.example ~/.config/pcwin.conf"
+    echo "e modifica IP/nome utente."
     exit 1
 fi
 source "$CONFIG_FILE"
@@ -126,7 +127,8 @@ EOF
     systemctl --user daemon-reload
     # enable-linger: i service partono anche senza login grafico
     if ! loginctl show-user "$USER" 2>/dev/null | grep -q "Linger=yes"; then
-        loginctl enable-linger "$USER" 2>/dev/null             && echo "🔁 Linger attivo: i service partono anche senza login."
+        loginctl enable-linger "$USER" 2>/dev/null \
+            && echo "🔁 Linger attivo: i service partono anche senza login."
     fi
     echo "✅ Service installati in $USER_SYSTEMD"
     echo "   Avvio:     pcwin tramamind"
@@ -235,7 +237,7 @@ case "$1" in
         ;;
     *)
         cat <<'EOF'
-pcwin — Controlla il PC Windows dal tuo Fedora (client TramaMind)
+pcwin — Controlla il PC Windows dal tuo Fedora
 
   pcwin term                 Terminale PowerShell sul PC Windows
   pcwin cmd                  Prompt cmd.exe remoto

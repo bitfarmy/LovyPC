@@ -1,105 +1,68 @@
-# LovyPC
+# LovyPC GUI v7 — Win95 Edition
 
-Controlla il tuo PC Windows dal tuo Fedora con un solo comando: **terminale remoto**, **cartelle condivise** e accesso a [TramaMind](https://github.com/bitfarmy/tramamind) — lo stack IA personale multi-modello orchestrato da OmniRoute.
+Interfaccia grafica stile Windows 95 per [LovyPC](https://github.com/bitfarmy/LovyPC) — **connettore universale tra PC Windows e Fedora**.
 
-Tutto cifrato via SSH, zero porte aperte sul Windows oltre alla 22.
+## ⚠️ Sicurezza
 
-## Come si collega a TramaMind
-
-TramaMind gira sul PC Windows. LovyPC ne espone i servizi sul tuo Fedora tramite tunnel SSH:
-
-| Servizio TramaMind | Porta remota | Sul Fedora diventa | Uso |
-|---|---|---|---|
-| **OmniRoute** (router L4) | `20128` | `http://localhost:20128` | Endpoint OpenAI-compatible — **unico necessario** |
-| OpenHands (agente L-APP) | `3000` | `http://localhost:3000` | Interfaccia web agente di coding |
-| Ollama (runtime L1) | `11434` | `http://localhost:11434` | Solo debug — normalmente passa da OmniRoute |
-
-## Funzionalità
-
-| Cosa | Come |
-|---|---|
-| **Terminale remoto** | PowerShell o CMD del PC Windows nel tuo terminale Fedora |
-| **Cartelle** | Monta le cartelle Windows via SSHFS in `~/pc-windows` |
-| **TramaMind** | Un tunnel verso OmniRoute — routing, failover, cache semantica inclusi |
-| **OpenHands** | Secondo tunnel opzionale verso l'interfaccia web |
-
-## Requisiti
-
-**Sul PC Windows:**
-- OpenSSH Server attivo — [guida Microsoft](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse)
-- TramaMind in esecuzione (`scripts/start-all.sh`)
-
-**Sul Fedora:**
-```bash
-sudo dnf install fuse-sshfs openssh-clients iputils
-```
+**Tool locale senza autenticazione.** Il server gira su `127.0.0.1:8080` e non deve essere esposto su rete esterna.
 
 ## Installazione
 
 ```bash
-# 1. Copia lo script
-sudo cp pcwin /usr/local/bin/pcwin && sudo chmod +x /usr/local/bin/pcwin
-
-# 2. Configura
-mkdir -p ~/.config
-cp pcwin.conf.example ~/.config/pcwin.conf
-nano ~/.config/pcwin.conf   # modifica WIN_IP, WIN_USER e WIN_FOLDER
+cd lovypc-gui
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cd backend
+python server.py
 ```
 
-**Accesso senza password (consigliato):**
-```bash
-ssh-keygen -t ed25519
-ssh-copy-id UtenteWindows@192.168.1.x
+Poi apri il browser su **http://localhost:8080**
+
+## Per fermare
+
+`Ctrl+C` nel terminale dove gira `server.py`
+
+## Fix dalla review v6
+
+| # | Problema | Soluzione |
+|---|---|---|
+| 🔴 | LED non aggiornati al primo giro | `await loadServices()` prima di `refreshStatus()` |
+| 🟡 | `$HOME` non espanso in MOUNT_POINT | Campo readonly, escluso da save |
+| 🟡 | Versioni disallineate (v3/v4/v6) | Allineate a v7 |
+
+## API Backend
+
+| Route | Metodo | Descrizione |
+|---|---|---|
+| `/api/health` | GET | Health check (versione, pcwin_found) |
+| `/api/status` | GET | Stato completo (network, tunnels, mount) |
+| `/api/services` | GET | Lista servizi da services.yaml |
+| `/api/config` | GET/POST | Leggi/Scrivi config (MOUNT_POINT readonly) |
+| `/api/connect/<svc>/<tunnel>` | POST | Connetti tunnel specifico |
+| `/api/disconnect/<svc>/<tunnel>` | POST | Disconnetti tunnel specifico |
+| `/api/connect/service/<svc>` | POST | Connetti tutti i tunnel di un servizio |
+| `/api/disconnect/service/<svc>` | POST | Disconnetti tutti i tunnel |
+| `/api/mount` | POST | Monta cartelle via SSHFS |
+| `/api/unmount` | POST | Smonta cartelle |
+| `/api/open-terminal` | POST | Apre gnome-terminal con pcwin term |
+| `/api/open-folder` | POST | Apre xdg-open sul mount point |
+| `/api/auto/<svc>/<tunnel>/<action>` | POST | Abilita/disabilita avvio automatico |
+
+## Struttura
+
 ```
-
-## Uso
-
-```bash
-pcwin status                 # panoramica: rete, tunnel, montaggi
-pcwin term                   # terminale PowerShell sul PC Windows
-pcwin cmd                    # prompt cmd.exe
-pcwin monta                  # monta le cartelle in ~/pc-windows
-pcwin gui                    # monta e apri il Gestore file
-pcwin smonta                 # smonta
-
-pcwin tramamind              # tunnel → OmniRoute :20128
-pcwin tramamind stop         # ferma
-pcwin tramamind ui           # tunnel → OpenHands :3000
-pcwin tramamind ui stop
-pcwin ollama                 # tunnel → Ollama :11434 (debug)
+lovypc-gui/
+├── backend/
+│   ├── server.py          # Flask API
+│   └── services.yaml      # Definizione servizi
+├── frontend/
+│   ├── index.html         # Shell Win95 con tab
+│   ├── css/win95.css      # Tema
+│   └── js/app.js          # Logica dinamica
+├── requirements.txt
+└── README.md
 ```
-
-**Dopo `pcwin tramamind`** — usa OmniRoute come provider OpenAI:
-```bash
-export OPENAI_BASE_URL=http://localhost:20128/v1
-export OPENAI_API_KEY=omniroute   # o la chiave configurata in OmniRoute
-```
-
-Se hai TramaMind clonato anche sul Fedora, puoi usare la sua CLI puntando al PC Windows:
-```bash
-./scripts/chat.sh "Scrivi un haiku sulla privacy"
-```
-
-## Service systemd (tunnel persistenti)
-
-Per avere i tunnel sempre attivi, anche dopo il login:
-
-```bash
-pcwin installa-service       # crea i .service in ~/.config/systemd/user/
-pcwin tramamind auto         # avvio automatico al login
-pcwin tramamind              # avvia/disattiva manualmente
-```
-
-**Gestione service:**
-```bash
-pcwin tramamind noauto       # disattiva avvio automatico
-pcwin disinstalla-service    # rimuovi tutti i service e i PID file
-journalctl --user -u pcwin-tramamind -f   # log in tempo reale
-systemctl --user status pcwin-tramamind   # stato dettagliato
-```
-
-> **Nota:** `pcwin installa-service` attiva automaticamente `loginctl enable-linger`, così i tunnel partono anche senza login grafico (es. dopo un riavvio del Fedora). Per disattivare: `loginctl disable-linger $USER`.
 
 ## Licenza
 
-[MIT](LICENSE)
+MIT

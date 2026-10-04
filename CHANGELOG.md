@@ -1,55 +1,46 @@
 # Changelog
 
-## v2.2 (2026-10-04)
+## GUI v7 (2026-10-04)
 
-Fix seconda review.
+- Allineamento frontend/backend (route dinamiche)
+- LED aggiornati al primo caricamento (`await loadServices()`)
+- `MOUNT_POINT` readonly (evita `$HOME` non espanso)
+- `/api/health` con versione
+- `parse_bash_value` e `escape_bash_value`
+- Polling adattivo 5s/15s
+- Versioni allineate a v7 ovunque
 
-- `installa-service` ora attiva `loginctl enable-linger` — i service partono anche senza login grafico
-- `.desktop`: aggiunti `Keywords=` per la ricerca nel menu GNOME
-- README: nota su `loginctl disable-linger` per chi vuole disattivare il comportamento
+## GUI v6 (2026-10-04)
 
-## v2.1 (2026-10-04)
+- Fix critici: frontend allineato a server.py generico
+- `refreshStatus()` legge `data.tunnels`
+- `openTerminal()` chiama `/api/open-terminal`
+- Polling adattivo implementato
+- `windowEl` null check
 
-Fix dalla review della community.
+## GUI v5 (2026-10-04)
 
-- `pcwin.conf.example` allineato: documentate tutte le variabili usate dallo script
-- `pcwin.desktop` — azione principale ora `pcwin tramamind` (era `status`), aggiunti `Actions=` per Term/Monta/Status
-- Nuovo comando `pcwin disinstalla-service` — rimuove service systemd e PID file
-- README: nuova sezione "Gestione service" con `noauto`, `journalctl`, `disinstalla-service`
-- README: chiarito che `scripts/chat.sh` appartiene a TramaMind, non a LovyPC
-- README: spiegato quando usare `pcwin ollama` (debug, solo se OmniRoute non risponde)
-- CHANGELOG: aggiunta sezione "Migrazione da v1.0"
+- `escape_bash_value` sanifica newline
+- `parse_bash_value` per apici singoli con `\''`
+- `save_config` aggiunge header se file nuovo
+- `load_services` con gestione errori
 
-### Migrazione da v2.0
+## GUI v4 (2026-10-04)
 
-- Nessuna breaking change rispetto alla v2.0
-- Se avevi installato i service con v2.0: riesegui `pcwin installa-service` per aggiornare
+- Validazione input (no path traversal)
+- CORS ristretto a localhost
+- Config non distruttiva (backup .bak)
+- Naming service allineato con pcwin
+- PCWIN path rilevato con `shutil.which`
+- XSS-safe (`createElement`)
+- `openTerminal()` e `openFolder()` reali
+- `requirements.txt`
+- Logging di base
 
-### Migrazione da v1.0
+## GUI v3 (2026-10-04)
 
-- Ferma eventuali tunnel v1: `pcwin ollama stop; pcwin omniroute stop`
-- I PID file in `~/.local/state/pcwin/` possono essere rimossi (`pcwin disinstalla-service` lo fa automaticamente)
-- La config `~/.config/pcwin.conf` resta valida — le variabili `OMNI_*_PORT` sono state rimosse (le porte sono fisse)
-- `pcwin omniroute` continua a funzionare come alias di `pcwin tramamind`
-
-## v2.0 (2026-10-04)
-
-Integrazione con TramaMind e systemd.
-
-- `pcwin tramamind` — tunnel verso OmniRoute :20128 (endpoint principale)
-- `pcwin tramamind ui` — tunnel verso OpenHands :3000
-- `pcwin tramamind auto/noauto` — avvio automatico al login via systemd user service
-- `pcwin installa-service` — genera i `.service` in `~/.config/systemd/user/`
-- `pcwin omniroute` — alias retrocompatibile di `tramamind`
-- `pcwin ollama` — ora marcato come debug
-- SSHFS con opzioni `reconnect` e keepalive
-- Pacchetto corretto per Fedora: `fuse-sshfs`
-
-## v1.0 (2026-10-03)
-
-Prima release pubblica.
-
-- `pcwin term` / `pcwin cmd` — terminale remoto
-- `pcwin monta` / `smonta` / `gui` — cartelle via SSHFS
-- `pcwin ollama` / `omniroute` — tunnel SSH
-- `pcwin status` — panoramica
+- Prima release della GUI
+- Tema Win95 completo
+- Tab SYSTEM / SERVICES / CONFIG / LOGS
+- `services.yaml` per servizi dinamici
+- Suoni WebAudio (modem, errore, successo)
