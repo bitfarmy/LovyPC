@@ -8,6 +8,7 @@
 #   tramamind [stop|auto|noauto]   → tunnel OmniRoute :20128
 #   tramamind ui [stop]            → tunnel OpenHands :3000
 #   ollama [stop]                  → tunnel Ollama :11434 (debug)
+#   installa-service | disinstalla-service
 # ============================================================
 
 CONFIG_FILE="${PCWIN_CONFIG:-$HOME/.config/pcwin.conf}"
@@ -35,9 +36,8 @@ check_reachable() {
     }
 }
 
-# Gestione tunnel: systemd se disponibile, altrimenti PID file
 use_systemd() {
-    [ -d "$USER_SYSTEMD" ] && systemctl --user list-unit-files 2>/dev/null | grep -q "^pcwin-"
+    [ -d "$USER_SYSTEMD" ] && ls "$USER_SYSTEMD"/pcwin-*.service &>/dev/null
 }
 
 tunnel_start() {
@@ -83,19 +83,20 @@ tunnel_auto() {
     echo "$([ "$action" = enable ] && echo '🔁 Avvio automatico attivo' || echo '⏸️  Avvio automatico disattivo') per pcwin-$name"
 }
 
-# Genera i file .service systemd user
 installa_service() {
     mkdir -p "$USER_SYSTEMD"
-    cat > "$USER_SYSTEMD/pcwin-tramamind.service" <<EOF
-[Unit]
-Description=LovyPC tunnel → TramaMind OmniRoute ($WIN_IP:20128)
-After=network-online.target
+    local common="After=network-online.target
 StartLimitIntervalSec=300
 StartLimitBurst=10
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 20128:localhost:20128 $WIN_USER@$WIN_IP
+ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3"
+
+    cat > "$USER_SYSTEMD/pcwin-tramamind.service" <<EOF
+[Unit]
+Description=LovyPC tunnel → TramaMind OmniRoute ($WIN_IP:20128)
+$common -L 20128:localhost:20128 $WIN_USER@$WIN_IP
 Restart=always
 RestartSec=10
 
@@ -105,13 +106,7 @@ EOF
     cat > "$USER_SYSTEMD/pcwin-tramamind-ui.service" <<EOF
 [Unit]
 Description=LovyPC tunnel → TramaMind OpenHands ($WIN_IP:3000)
-After=network-online.target
-StartLimitIntervalSec=300
-StartLimitBurst=10
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 3000:localhost:3000 $WIN_USER@$WIN_IP
+$common -L 3000:localhost:3000 $WIN_USER@$WIN_IP
 Restart=always
 RestartSec=10
 
@@ -121,13 +116,7 @@ EOF
     cat > "$USER_SYSTEMD/pcwin-ollama.service" <<EOF
 [Unit]
 Description=LovyPC tunnel → Ollama ($WIN_IP:11434) — debug
-After=network-online.target
-StartLimitIntervalSec=300
-StartLimitBurst=10
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 11434:localhost:11434 $WIN_USER@$WIN_IP
+$common -L 11434:localhost:11434 $WIN_USER@$WIN_IP
 Restart=always
 RestartSec=10
 
@@ -135,9 +124,28 @@ RestartSec=10
 WantedBy=default.target
 EOF
     systemctl --user daemon-reload
+    # enable-linger: i service partono anche senza login grafico
+    if ! loginctl show-user "$USER" 2>/dev/null | grep -q "Linger=yes"; then
+        loginctl enable-linger "$USER" 2>/dev/null             && echo "🔁 Linger attivo: i service partono anche senza login."
+    fi
     echo "✅ Service installati in $USER_SYSTEMD"
-    echo "   pcwin tramamind        → avvia/disattiva on-demand"
-    echo "   pcwin tramamind auto   → avvio automatico al login"
+    echo "   Avvio:     pcwin tramamind"
+    echo "   Auto:      pcwin tramamind auto"
+    echo "   Log:       journalctl --user -u pcwin-tramamind -f"
+}
+
+disinstalla_service() {
+    if [ ! -d "$USER_SYSTEMD" ]; then
+        echo "Nessun service installato."
+        exit 0
+    fi
+    for s in tramamind tramamind-ui ollama; do
+        systemctl --user disable --now "pcwin-$s.service" 2>/dev/null
+        rm -f "$USER_SYSTEMD/pcwin-$s.service"
+    done
+    systemctl --user daemon-reload
+    rm -rf "$HOME/.local/state/pcwin"
+    echo "✅ Service disinstallati, PID file rimossi."
 }
 
 # ---------- comandi ----------
@@ -187,7 +195,7 @@ case "$1" in
         case "$2" in
             stop) tunnel_stop ollama ;;
             *)    tunnel_start ollama 11434 11434
-                  echo "   Ollama → http://localhost:11434 (debug diretto)" ;;
+                  echo "   Ollama → http://localhost:11434 (debug: usa solo se OmniRoute non risponde)" ;;
         esac
         ;;
     omniroute)
@@ -196,6 +204,9 @@ case "$1" in
         ;;
     installa-service)
         installa_service
+        ;;
+    disinstalla-service)
+        disinstalla_service
         ;;
     status)
         echo "PC Windows: $WIN_USER@$WIN_IP  (cartella: $WIN_FOLDER)"
@@ -242,8 +253,10 @@ pcwin — Controlla il PC Windows dal tuo Fedora (client TramaMind)
   pcwin omniroute            Alias di tramamind (retrocompatibilità)
 
   pcwin installa-service     Crea i service systemd user
+  pcwin disinstalla-service  Rimuovi service e PID file
   pcwin status               Panoramica completa
 
+Log: journalctl --user -u pcwin-tramamind -f
 Config: ~/.config/pcwin.conf
 EOF
         ;;

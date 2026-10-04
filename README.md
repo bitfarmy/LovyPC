@@ -12,7 +12,7 @@ TramaMind gira sul PC Windows. LovyPC ne espone i servizi sul tuo Fedora tramite
 |---|---|---|---|
 | **OmniRoute** (router L4) | `20128` | `http://localhost:20128` | Endpoint OpenAI-compatible — **unico necessario** |
 | OpenHands (agente L-APP) | `3000` | `http://localhost:3000` | Interfaccia web agente di coding |
-| Ollama (runtime L1) | `11434` | `http://localhost:11434` | Solo debug diretto — normalmente passa da OmniRoute |
+| Ollama (runtime L1) | `11434` | `http://localhost:11434` | Solo debug — normalmente passa da OmniRoute |
 
 ## Funzionalità
 
@@ -52,12 +52,6 @@ ssh-keygen -t ed25519
 ssh-copy-id UtenteWindows@192.168.1.x
 ```
 
-**Service systemd (tunnel persistenti, opzionale):**
-```bash
-pcwin installa-service
-pcwin tramamind auto     # avvia il tunnel a ogni login
-```
-
 ## Uso
 
 ```bash
@@ -81,10 +75,30 @@ export OPENAI_BASE_URL=http://localhost:20128/v1
 export OPENAI_API_KEY=omniroute   # o la chiave configurata in OmniRoute
 ```
 
-Oppure con la CLI di TramaMind (se installata sul Fedora, puntando al PC Windows):
+Se hai TramaMind clonato anche sul Fedora, puoi usare la sua CLI puntando al PC Windows:
 ```bash
 ./scripts/chat.sh "Scrivi un haiku sulla privacy"
 ```
+
+## Service systemd (tunnel persistenti)
+
+Per avere i tunnel sempre attivi, anche dopo il login:
+
+```bash
+pcwin installa-service       # crea i .service in ~/.config/systemd/user/
+pcwin tramamind auto         # avvio automatico al login
+pcwin tramamind              # avvia/disattiva manualmente
+```
+
+**Gestione service:**
+```bash
+pcwin tramamind noauto       # disattiva avvio automatico
+pcwin disinstalla-service    # rimuovi tutti i service e i PID file
+journalctl --user -u pcwin-tramamind -f   # log in tempo reale
+systemctl --user status pcwin-tramamind   # stato dettagliato
+```
+
+> **Nota:** `pcwin installa-service` attiva automaticamente `loginctl enable-linger`, così i tunnel partono anche senza login grafico (es. dopo un riavvio del Fedora). Per disattivare: `loginctl disable-linger $USER`.
 
 ## Licenza
 

@@ -1,9 +1,23 @@
-# Configurazione pcwin — modifica con i tuoi dati
+# ============================================================
+# Configurazione pcwin (LovyPC v2.2)
+# Copia in:  cp pcwin.conf.example ~/.config/pcwin.conf
+# ============================================================
+
+# --- Connessione al PC Windows (obbligatorio) ---
 WIN_USER="NomeUtenteWindows"
 WIN_IP="192.168.1.x"
 
-# Cartella Windows da montare (usa / anche se è Windows)
+# --- Cartella Windows da montare via SSHFS ---
+# Usa / anche se è Windows. Lascia vuoto per montare C:/Users/%WIN_USER%
 WIN_FOLDER="C:/Users/NomeUtenteWindows"
 
-# Dove montarla sul Fedora
-MOUNT_POINT="$HOME/pc-windows"
+# --- Punto di mount sul Fedora (opzionale, default: ~/pc-windows) ---
+# MOUNT_POINT="$HOME/pc-windows"
+
+# --- Porte TramaMind (fisse) ---
+# OmniRoute : 20128 · OpenHands : 3000 · Ollama : 11434 (debug)
+
+# --- Note ---
+# - Le variabili OMNI_*_PORT della v1 sono state rimosse: le porte sono fisse
+# - I service systemd non usano variabili extra: leggono questa config
+# - Per il log dei tunnel: journalctl --user -u pcwin-tramamind -f

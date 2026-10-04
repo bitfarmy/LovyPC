@@ -1,8 +1,22 @@
 [Desktop Entry]
 Name=LovyPC
 Comment=Controlla il tuo PC Windows e TramaMind
-Exec=gnome-terminal -- bash -c "pcwin status; exec bash"
+Exec=gnome-terminal -- bash -c "pcwin tramamind; exec bash"
 Icon=preferences-system-network
 Terminal=false
 Type=Application
 Categories=Utility;
+Keywords=windows;ssh;tramamind;openhands;terminale;remoto;ollama;
+Actions=Term;Monta;Status;
+
+[Desktop Action Term]
+Name=Terminale Windows
+Exec=gnome-terminal -- bash -c "pcwin term; exec bash"
+
+[Desktop Action Monta]
+Name=Monta cartelle
+Exec=gnome-terminal -- bash -c "pcwin monta; exec bash"
+
+[Desktop Action Status]
+Name=Stato connessioni
+Exec=gnome-terminal -- bash -c "pcwin status; exec bash"
