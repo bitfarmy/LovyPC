@@ -122,6 +122,12 @@ async function refreshStatus() {
                     btn.textContent = tunnel.active ? 'DISCONNECT' : 'CONNECT';
                     btn.classList.toggle('disconnect', tunnel.active);
                 }
+
+                const autoBtn = document.getElementById(`auto-${name}`);
+                if (autoBtn) {
+                    autoBtn.textContent = tunnel.enabled ? 'AUTO ✓' : 'AUTO';
+                    autoBtn.classList.toggle('on', tunnel.enabled);
+                }
             });
         }
 
@@ -237,7 +243,15 @@ function renderServices(services) {
             btn.textContent = 'CONNECT';
             btn.onclick = () => toggleTunnel(key, tunnel.name);
 
+            const btnAuto = document.createElement('button');
+            btnAuto.className = 'win95-btn small';
+            btnAuto.id = `auto-${tname}`;
+            btnAuto.textContent = 'AUTO';
+            btnAuto.title = 'Avvio automatico al login (spento = zero attività in background)';
+            btnAuto.onclick = () => toggleAuto(key, tunnel.name);
+
             tactions.appendChild(btn);
+            tactions.appendChild(btnAuto);
 
             row.appendChild(tinfo);
             row.appendChild(led);
@@ -315,6 +329,28 @@ async function disconnectService(svcKey) {
         refreshStatus();
     } catch(e) {
         addLog('Error: ' + e.message, 'error');
+    }
+}
+
+// AUTO: interruttore avvio automatico — spento = zero attività in background
+async function toggleAuto(svcKey, tunnelName) {
+    const btn = document.getElementById(`auto-${svcKey}-${tunnelName}`);
+    const isOn = btn && btn.classList.contains('on');
+    const action = isOn ? 'noauto' : 'auto';
+    addLog(`${isOn ? 'Disattivazione' : 'Attivazione'} AUTO per ${svcKey}/${tunnelName}...`, 'info');
+
+    try {
+        const res = await fetch(`${API}/auto/${svcKey}/${tunnelName}/${action}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showSuccess(isOn ? 'AUTO OFF' : 'AUTO ON ✓');
+            addLog(`AUTO ${isOn ? 'disattivato' : 'attivato'} per ${svcKey}/${tunnelName}`, 'info');
+        } else {
+            showError('AUTO fallito: ' + (data.error || ''));
+        }
+        refreshStatus();
+    } catch(e) {
+        showError(e.message);
     }
 }
 
