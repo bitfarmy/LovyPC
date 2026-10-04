@@ -1,0 +1,34 @@
+# LovyPC — Definizione servizi
+# Aggiungi un servizio = aggiungi un blocco qui sotto
+# Il nome del service systemd è costruito da pcwin_cmd:
+#   "tramamind"     → pcwin-tramamind.service
+#   "tramamind ui"  → pcwin-tramamind-ui.service
+
+services:
+  tramamind:
+    name: TramaMind
+    description: IA personale multi-modello
+    icon: "🧵"
+    tunnels:
+      - name: omniroute
+        display: OmniRoute
+        port: 20128
+        pcwin_cmd: tramamind
+        url: http://localhost:20128/v1
+      - name: openhands
+        display: OpenHands
+        port: 3000
+        pcwin_cmd: "tramamind ui"
+        url: http://localhost:3000
+
+  # Esempio per futuri servizi:
+  # mioservizio:
+  #   name: Mio Servizio
+  #   description: Cosa fa
+  #   icon: "🚀"
+  #   tunnels:
+  #     - name: main
+  #       display: Main
+  #       port: 8080
+  #       pcwin_cmd: "custom tunnel command"
+  #       url: http://localhost:8080

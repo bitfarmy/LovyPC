@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LovyPC GUI v7 — Win95 Edition</title>
+    <link rel="stylesheet" href="css/win95.css">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="desktop"></div>
+
+    <div class="window" id="main-window">
+        <div class="title-bar">
+            <div class="title-bar-text">
+                <span class="icon">🖥️</span> LovyPC — Universal PC Connector
+            </div>
+            <div class="title-bar-buttons">
+                <button class="title-bar-button">_</button>
+                <button class="title-bar-button">□</button>
+                <button class="title-bar-button close">×</button>
+            </div>
+        </div>
+
+        <div class="window-body">
+            <!-- Tab Navigation -->
+            <div class="tab-container">
+                <button class="tab active" data-tab="system">SYSTEM</button>
+                <button class="tab" data-tab="services">SERVICES</button>
+                <button class="tab" data-tab="config">CONFIG</button>
+                <button class="tab" data-tab="logs">LOGS</button>
+            </div>
+
+            <!-- TAB: System -->
+            <div class="tab-content active" id="tab-system">
+                <div class="status-panel">
+                    <div class="status-item">
+                        <div class="led" id="network-led"></div>
+                        <span>NETWORK</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="led" id="mount-led"></div>
+                        <span>FOLDERS</span>
+                    </div>
+                </div>
+
+                <div class="info-panel">
+                    <div class="info-row">
+                        <span class="label">TARGET:</span>
+                        <span class="value" id="target-info">—</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">STATUS:</span>
+                        <span class="value" id="status-text">READY</span>
+                    </div>
+                </div>
+
+                <div class="control-panel">
+                    <div class="button-row">
+                        <button class="win95-btn primary" onclick="openTerminal()">
+                            <span class="btn-icon">⌨️</span>
+                            TERMINAL
+                        </button>
+                        <button class="win95-btn" onclick="mount()">
+                            <span class="btn-icon">📁</span>
+                            MOUNT
+                        </button>
+                        <button class="win95-btn" onclick="unmount()">
+                            <span class="btn-icon">📂</span>
+                            UNMOUNT
+                        </button>
+                    </div>
+                    <div class="button-row">
+                        <button class="win95-btn" onclick="openFolder()">
+                            <span class="btn-icon">🗂️</span>
+                            OPEN FOLDER
+                        </button>
+                        <button class="win95-btn" onclick="refreshStatus()">
+                            <span class="btn-icon">🔄</span>
+                            REFRESH
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Services (dinamico da services.yaml) -->
+            <div class="tab-content" id="tab-services">
+                <div id="services-container">
+                    <div class="loading">Loading services...</div>
+                </div>
+            </div>
+
+            <!-- TAB: Config -->
+            <div class="tab-content" id="tab-config">
+                <div class="config-panel">
+                    <div class="config-row">
+                        <label>Windows User:</label>
+                        <input type="text" id="cfg-win-user" class="win95-input">
+                    </div>
+                    <div class="config-row">
+                        <label>Windows IP:</label>
+                        <input type="text" id="cfg-win-ip" class="win95-input">
+                    </div>
+                    <div class="config-row">
+                        <label>Shared Folder:</label>
+                        <input type="text" id="cfg-win-folder" class="win95-input">
+                    </div>
+                    <div class="config-row">
+                        <label>Mount Point:</label>
+                        <input type="text" id="cfg-mount-point" class="win95-input" readonly
+                               title="Modifica manualmente in ~/.config/pcwin.conf">
+                    </div>
+                    <div class="button-row">
+                        <button class="win95-btn primary" onclick="saveConfig()">
+                            <span class="btn-icon">💾</span>
+                            SAVE
+                        </button>
+                        <button class="win95-btn" onclick="loadConfig()">
+                            <span class="btn-icon">📥</span>
+                            RELOAD
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Logs -->
+            <div class="tab-content" id="tab-logs">
+                <div class="log-panel full-height">
+                    <div class="log-title">SYSTEM LOG</div>
+                    <div class="log-content" id="log">
+                        <div class="log-line">[READY] LovyPC GUI v7 initialized</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer-note">
+                <span style="font-size:11px; color:#606060;">
+                    🔒 Local tool — no authentication. Runs on 127.0.0.1 only.
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlays -->
+    <div class="overlay" id="connect-overlay">
+        <div class="overlay-content">
+            <div class="modem-animation">
+                <div class="modem-text" id="connect-text">CONNECTING...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="modem-sound">[MODEM HANDSHAKE]</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay error" id="error-overlay">
+        <div class="overlay-content">
+            <div class="error-box">
+                <div class="error-title">⚠ ERROR ⚠</div>
+                <div class="error-text" id="error-msg">Connection failed</div>
+                <button class="win95-btn" onclick="closeError()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-flash" id="success-flash">✓</div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
