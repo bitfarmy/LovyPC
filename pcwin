@@ -5,6 +5,7 @@
 #
 # Comandi:
 #   term | cmd | monta | smonta | gui | status
+#   setup-ssh                  → accesso senza password (chiave SSH)
 #   tramamind [stop|auto|noauto]   → tunnel OmniRoute :20128
 #   tramamind ui [stop]            → tunnel OpenHands :3000
 #   ollama [stop]                  → tunnel Ollama :11434 (debug)
@@ -39,6 +40,46 @@ check_reachable() {
 
 use_systemd() {
     [ -d "$USER_SYSTEMD" ] && ls "$USER_SYSTEMD"/pcwin-*.service &>/dev/null
+}
+
+# ---------- setup ssh ----------
+setup_ssh() {
+    local key="$HOME/.ssh/id_ed25519"
+
+    # 1. Chiave: creala se manca (senza passphrase)
+    if [ ! -f "$key" ]; then
+        echo "[..] Creo la chiave SSH..."
+        mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+        ssh-keygen -t ed25519 -N "" -f "$key" -q
+        echo "[OK] Chiave creata: $key"
+    fi
+
+    check_reachable
+
+    # 2. Se il login senza password funziona già, hai finito
+    if ssh -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=accept-new "$WIN_USER@$WIN_IP" exit 2>/dev/null; then
+        echo "✅ Accesso SSH senza password già attivo."
+        exit 0
+    fi
+
+    # 3. Installa la chiave sul Windows (chiede la password Windows UNA volta)
+    echo "[..] Installazione chiave su $WIN_USER@$WIN_IP"
+    echo "     (inserisci la password Windows UNA volta)"
+    local pub
+    pub=$(cat "$key.pub")
+    ssh -o StrictHostKeyChecking=accept-new "$WIN_USER@$WIN_IP" \
+        "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path 'C:/Users/$WIN_USER/.ssh' | Out-Null; if (-not (Test-Path 'C:/Users/$WIN_USER/.ssh/authorized_keys')) { New-Item -ItemType File -Path 'C:/Users/$WIN_USER/.ssh/authorized_keys' | Out-Null }; if (-not (Select-String -Path 'C:/Users/$WIN_USER/.ssh/authorized_keys' -Pattern ([regex]::Escape('$pub')) -Quiet -ErrorAction SilentlyContinue)) { Add-Content -Path 'C:/Users/$WIN_USER/.ssh/authorized_keys' -Value '$pub' }\"" \
+        || { echo "❌ Installazione chiave fallita."; exit 1; }
+
+    # 4. Verifica
+    if ssh -o BatchMode=yes -o PasswordAuthentication=no "$WIN_USER@$WIN_IP" exit 2>/dev/null; then
+        echo "✅ Fatto: login SSH senza password attivo."
+    else
+        echo "⚠️  Chiave installata ma la verifica non è riuscita."
+        echo "    Su Windows controlla: C:\\Users\\$WIN_USER\\.ssh\\authorized_keys"
+        exit 1
+    fi
 }
 
 tunnel_start() {
@@ -178,6 +219,9 @@ case "$1" in
     gui)
         "$0" monta && xdg-open "$MOUNT_POINT" 2>/dev/null &
         ;;
+    setup-ssh)
+        setup_ssh
+        ;;
     tramamind)
         case "$2" in
             stop)   tunnel_stop tramamind ;;
@@ -245,6 +289,7 @@ pcwin — Controlla il PC Windows dal tuo Fedora
   pcwin cmd                  Prompt cmd.exe remoto
   pcwin monta | smonta       Monta/smonta le cartelle in ~/pc-windows
   pcwin gui                  Monta e apri il Gestore file
+  pcwin setup-ssh            Accesso senza password (chiave SSH, una tantum)
 
   pcwin tramamind            Tunnel → OmniRoute :20128 (endpoint principale)
   pcwin tramamind stop       Ferma il tunnel

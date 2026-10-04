@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LovyPC GUI v7.1 — Backend
+LovyPC GUI v7.3 — Backend
 Connettore universale PC Windows ↔ Fedora
 
 FIX rispetto a v2:
@@ -10,6 +10,10 @@ FIX rispetto a v2:
 - Naming service allineato con pcwin
 - PCWIN path rilevato automaticamente
 - Logging di base
+
+Novità v7.2:
+- /api/setup-ssh: configura accesso SSH senza password (apre terminale
+  se serve la password Windows)
 """
 
 import subprocess
@@ -408,6 +412,55 @@ def api_unmount():
         logger.error(f'Unmount failed: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/setup-ssh', methods=['POST'])
+def api_setup_ssh():
+    """Configura accesso SSH senza password.
+    Se il login senza password funziona già → risponde subito.
+    Altrimenti apre un terminale visibile che esegue 'pcwin setup-ssh'
+    (serve la password Windows UNA volta)."""
+    config = load_config()
+    win_user = config.get('WIN_USER', '').strip()
+    win_ip = config.get('WIN_IP', '').strip()
+
+    if not win_user or not win_ip:
+        return jsonify({'success': False,
+                        'error': 'Configura prima Windows User e IP (tab CONFIG)'}), 400
+
+    target = f'{win_user}@{win_ip}'
+
+    # Già configurato? Rispondi subito senza aprire nulla
+    try:
+        r = subprocess.run(
+            ['ssh', '-o', 'BatchMode=yes', '-o', 'PasswordAuthentication=no',
+             '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=accept-new',
+             target, 'exit'],
+            capture_output=True, timeout=8)
+        if r.returncode == 0:
+            return jsonify({'success': True,
+                            'output': 'Accesso SSH senza password già attivo'})
+    except Exception:
+        pass
+
+    # Serve la password Windows: apri un terminale visibile
+    term = shutil.which('ptyxis') or shutil.which('gnome-terminal')
+    if not term:
+        return jsonify({'success': False,
+                        'error': 'Nessun terminale trovato (ptyxis/gnome-terminal)'}), 500
+
+    logger.info(f'setup-ssh: apertura terminale per {target}')
+    try:
+        subprocess.Popen(
+            [term, '--', 'bash', '-c',
+             f'{PCWIN} setup-ssh; echo; read -p "Premi Invio per chiudere..."'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE
+        )
+        return jsonify({'success': True,
+                        'output': 'Terminale aperto: inserisci la password Windows UNA volta'})
+    except Exception as e:
+        logger.error(f'setup-ssh failed: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/open-folder', methods=['POST'])
 def api_open_folder():
     """Apre la cartella montata nel file manager"""
@@ -485,7 +538,7 @@ def api_health():
     """Health check per frontend"""
     return jsonify({
         'status': 'ok',
-        'version': '7.1',
+        'version': '7.3',
         'pcwin_found': os.path.exists(PCWIN),
         'config_exists': os.path.exists(CONFIG_FILE)
     })
@@ -493,7 +546,7 @@ def api_health():
 if __name__ == '__main__':
     print("""
     ╔══════════════════════════════════════════╗
-    ║     LovyPC GUI v7.1 — Win95 Edition        ║
+    ║     LovyPC GUI v7.3 — Win95 Edition      ║
     ║     Universal PC Connector               ║
     ║                                          ║
     ║     GUI:  http://localhost:8080          ║
@@ -502,5 +555,5 @@ if __name__ == '__main__':
     ║     Ctrl+C to stop                       ║
     ╚══════════════════════════════════════════╝
     """)
-    logger.info('Starting LovyPC GUI server v7.1 on http://localhost:8080')
+    logger.info('Starting LovyPC GUI server v7.2 on http://localhost:8080')
     app.run(host='127.0.0.1', port=8080, debug=False)

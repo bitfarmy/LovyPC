@@ -1,6 +1,7 @@
 // ============================================
-// LovyPC GUI v7.1 — Frontend
+// LovyPC GUI v7.3 — Frontend
 // Allineato a server.py generico (route dinamiche)
+// Novità v7.3: setup SSH senza password dalla tab CONFIG
 // ============================================
 
 const API = 'http://localhost:8080/api';
@@ -429,6 +430,23 @@ function getInput(id) {
     return el ? el.value : '';
 }
 
+// NOVITÀ v7.3: setup SSH senza password dalla GUI
+async function setupSsh() {
+    addLog('Setup SSH: controllo accesso senza password...', 'info');
+    try {
+        const res = await fetch(`${API}/setup-ssh`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showSuccess('SSH OK ✓');
+            addLog(data.output || 'SSH setup completato', 'info');
+        } else {
+            showError('SSH setup fallito: ' + (data.error || ''));
+        }
+    } catch(e) {
+        showError(e.message);
+    }
+}
+
 // Animations
 function showConnectAnimation(text) {
     const overlay = document.getElementById('connect-overlay');
@@ -503,7 +521,7 @@ document.addEventListener('mouseup', () => { isDragging = false; });
 
 // Init
 window.onload = async () => {
-    addLog('LovyPC GUI v7 started', 'info');
+    addLog('LovyPC GUI v7.3 started', 'info');
 
     // Health check
     try {

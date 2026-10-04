@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LovyPC GUI v7.1 — Win95 Edition</title>
+    <title>LovyPC GUI v7.3 — Win95 Edition</title>
     <link rel="stylesheet" href="css/win95.css">
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 </head>
@@ -118,6 +118,11 @@
                         <button class="win95-btn" onclick="loadConfig()">
                             <span class="btn-icon">📥</span>
                             RELOAD
+                        </button>
+                        <button class="win95-btn" onclick="setupSsh()"
+                                title="Configura accesso SSH senza password (chiede la password Windows una volta)">
+                            <span class="btn-icon">🔐</span>
+                            SETUP SSH
                         </button>
                     </div>
                 </div>
