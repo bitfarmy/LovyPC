@@ -278,8 +278,12 @@ case "$1" in
             [ "$rc" -eq 0 ] && any=1
             [ "$rc" -eq 1 ] && fail=1
         done
-        [ "$any" -eq 0 ] && [ "$fail" -eq 0 ] && echo "Niente da smontare."
-        [ "$fail" -eq 1 ] && exit 1
+        if [ "$fail" -eq 1 ]; then
+            exit 1
+        fi
+        if [ "$any" -eq 0 ]; then
+            echo "Niente da smontare."
+        fi
         ;;
     gui)
         "$0" monta && xdg-open "$MOUNT_POINT" 2>/dev/null &

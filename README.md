@@ -1,6 +1,6 @@
 # LovyPC
 
-![Version](https://img.shields.io/badge/version-7.4-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-7.5.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Fedora%20Linux-blue?style=flat-square)
 ![UI](https://img.shields.io/badge/UI-Win95%20Edition-c0c0c0?style=flat-square)
@@ -44,7 +44,9 @@ After the first run, this is enough to pick up later changes:
 git pull && bash gui/start.sh
 ```
 
-If the window is already open, close it first. Closing the browser tab leaves the server running, and `start.sh` will only open the browser again. Stop the server with Ctrl+C in the terminal where you started it, then run `start.sh` once more.
+To close LovyPC, use the red **OFF** button, or the red **×** on the title bar. It asks for confirmation, unmounts the Windows folders, and then stops the server. The page can be closed after the status says **SPENTO**. Closing the browser tab alone leaves the server and the disk mount running.
+
+If the window is already open from an older run, stop that server with Ctrl+C in its terminal, then run `start.sh` once more. While a server is still running, `start.sh` only opens the browser.
 
 ---
 
@@ -90,7 +92,7 @@ While the disk is mounted, LovyPC checks `/proc/self/mountinfo` instead of askin
 
 | Tab | What you find there |
 |---|---|
-| SYSTEM | Network and mount lights, remote terminal, mount and unmount, open the folder, refresh. |
+| SYSTEM | Network and mount lights, remote terminal, mount and unmount, open the folder, refresh. The red OFF button is at the bottom of every tab. |
 | SERVICES | One card for each entry in `services.yaml`. Connect or disconnect a single tunnel, or the whole service. |
 | CONFIG | Windows user, IP address, and folder. The mount path is shown and is not editable here. SETUP SSH is on this tab. |
 | LOGS | What the window just did. |
@@ -108,6 +110,7 @@ While the disk is mounted, LovyPC checks `/proc/self/mountinfo` instead of askin
 | `/api/connect/service/<svc>` | POST | Open every tunnel of a service. |
 | `/api/disconnect/service/<svc>` | POST | Close every tunnel of a service. |
 | `/api/mount`, `/api/unmount` | POST | Mount or unmount the Windows folders. |
+| `/api/shutdown` | POST | Unmount, then stop the server. If the disk is still mounted, the server stays up. |
 | `/api/setup-ssh` | POST | Install the SSH key. Opens a terminal if Windows asks for the password. |
 | `/api/open-terminal` | POST | Open a terminal with `pcwin term`. Ptyxis is preferred, then GNOME Terminal. |
 | `/api/open-folder` | POST | Open the mounted folder in the file manager. |

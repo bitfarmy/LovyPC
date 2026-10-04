@@ -7,6 +7,7 @@
 const API = 'http://localhost:8080/api';
 let servicesData = null;
 let backendOnline = false;
+let shuttingDown = false;
 
 // WebAudio
 let audioCtx = null;
@@ -86,6 +87,7 @@ function initTabs() {
 
 // Status — FIX: legge data.tunnels, non data.omniroute
 async function refreshStatus() {
+    if (shuttingDown) return;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -133,6 +135,7 @@ async function refreshStatus() {
 
     } catch(e) {
         clearTimeout(timeoutId);
+        if (shuttingDown) return;
         if (backendOnline) {
             backendOnline = false;
             addLog('Backend non raggiungibile — avvia server.py', 'error');
@@ -383,6 +386,46 @@ async function unmount() {
     }
 }
 
+function powerOff() {
+    if (shuttingDown) return;
+    const overlay = document.getElementById('off-overlay');
+    if (overlay) overlay.classList.add('active');
+}
+
+function cancelPowerOff() {
+    const overlay = document.getElementById('off-overlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
+async function confirmPowerOff() {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    cancelPowerOff();
+    const btn = document.getElementById('btn-off');
+    if (btn) btn.disabled = true;
+    addLog('OFF: smonto le cartelle e chiudo...', 'info');
+    try {
+        const res = await fetch(`${API}/shutdown`, { method: 'POST' });
+        let data = {};
+        try { data = await res.json(); } catch (err) { data = {}; }
+        if (!res.ok || !data.success) {
+            shuttingDown = false;
+            if (btn) btn.disabled = false;
+            showError(data.error || 'Smontaggio non riuscito. LovyPC resta aperto.');
+            return;
+        }
+        const statusEl = document.getElementById('status-text');
+        if (statusEl) statusEl.textContent = 'SPENTO';
+        updateLed('mount-led', false);
+        addLog('Cartelle smontate. LovyPC è chiuso. Puoi chiudere questa pagina.', 'info');
+        showSuccess('OFF');
+    } catch (e) {
+        shuttingDown = false;
+        if (btn) btn.disabled = false;
+        showError('Chiusura non riuscita: ' + e.message);
+    }
+}
+
 // FIX: openTerminal chiama /api/open-terminal
 async function openTerminal() {
     addLog('Opening terminal...', 'info');
@@ -557,7 +600,7 @@ document.addEventListener('mouseup', () => { isDragging = false; });
 
 // Init
 window.onload = async () => {
-    addLog('LovyPC GUI v7.3 started', 'info');
+    addLog('LovyPC GUI v7.5.0 started', 'info');
 
     // Health check
     try {
@@ -584,6 +627,7 @@ window.onload = async () => {
         const anyActive = document.querySelectorAll('.led.active').length > 0;
         const interval = anyActive ? 5000 : 15000;
         setTimeout(async () => {
+            if (shuttingDown) return;
             await refreshStatus();
             scheduleNextPoll();
         }, interval);

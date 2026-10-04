@@ -18,6 +18,9 @@ import sys
 import shutil
 import logging
 import re
+import signal
+import threading
+import time
 import yaml
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -31,6 +34,7 @@ logger = logging.getLogger('lovypc-gui')
 
 # ============ APP ============
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 CORS(app, origins=['http://localhost:8080', 'http://127.0.0.1:8080'])
 
 # ============ CONFIG ============
@@ -433,6 +437,37 @@ def api_unmount():
         logger.error(f'Unmount failed: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def request_shutdown():
+    """Smonta i dischi Windows. Non termina il processo."""
+    try:
+        r = subprocess.run([PCWIN, 'smonta'], capture_output=True, text=True, timeout=15)
+    except subprocess.TimeoutExpired:
+        return False, 'Lo smontaggio ha impiegato troppo. LovyPC resta aperto.'
+    except Exception as e:
+        logger.error(f'Shutdown unmount failed: {e}')
+        return False, str(e)
+    text = (r.stdout or r.stderr or '').strip()
+    _, mounted = active_mount(load_config())
+    # Conta il disco rimasto, non il codice di uscita: se è via, si può chiudere.
+    if mounted:
+        return False, text or 'Non riesco a smontare. Chiudi le finestre che usano quelle cartelle.'
+    return True, text or 'Smontato.'
+
+def _stop_server():
+    time.sleep(0.4)
+    os.kill(os.getpid(), signal.SIGTERM)
+
+@app.route('/api/shutdown', methods=['POST'])
+def api_shutdown():
+    """Smonta e, solo se il disco è via, chiude il server."""
+    ok, message = request_shutdown()
+    if not ok:
+        logger.warning(f'Shutdown rifiutato: {message}')
+        return jsonify({'success': False, 'error': message}), 500
+    logger.info('Shutdown: dischi smontati, chiusura server')
+    threading.Thread(target=_stop_server, daemon=True).start()
+    return jsonify({'success': True, 'output': message})
+
 @app.route('/api/open-folder', methods=['POST'])
 def api_open_folder():
     """Apre la cartella montata nel file manager"""
@@ -505,7 +540,7 @@ def api_health():
     """Health check per frontend"""
     return jsonify({
         'status': 'ok',
-        'version': '7.0',
+        'version': '7.5.0',
         'pcwin_found': os.path.exists(PCWIN),
         'config_exists': os.path.exists(CONFIG_FILE)
     })

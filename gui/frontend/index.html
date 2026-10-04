@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LovyPC GUI v7.3 — Win95 Edition</title>
+    <title>LovyPC GUI v7.5.0 — Win95 Edition</title>
     <link rel="stylesheet" href="css/win95.css">
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 </head>
@@ -18,7 +18,7 @@
             <div class="title-bar-buttons">
                 <button class="title-bar-button">_</button>
                 <button class="title-bar-button">□</button>
-                <button class="title-bar-button close">×</button>
+                <button type="button" class="title-bar-button close" onclick="powerOff()" title="Smonta e chiudi">×</button>
             </div>
         </div>
 
@@ -140,6 +140,7 @@
 
             <!-- Footer -->
             <div class="footer-note">
+                <button type="button" class="win95-btn off" id="btn-off" onclick="powerOff()">OFF</button>
                 <span style="font-size:11px; color:#606060;">
                     🔒 Local tool — no authentication. Runs on 127.0.0.1 only.
                 </span>
@@ -156,6 +157,19 @@
                     <div class="progress-fill" id="progress-fill"></div>
                 </div>
                 <div class="modem-sound">[MODEM HANDSHAKE]</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="off-overlay">
+        <div class="overlay-content">
+            <div class="error-box">
+                <div class="error-title">OFF</div>
+                <div class="error-text">Smonta le cartelle Windows e chiude LovyPC.</div>
+                <div class="button-row">
+                    <button type="button" class="win95-btn off" onclick="confirmPowerOff()">OFF</button>
+                    <button type="button" class="win95-btn" onclick="cancelPowerOff()">ANNULLA</button>
+                </div>
             </div>
         </div>
     </div>
